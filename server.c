@@ -20,10 +20,12 @@ void *get_in_addr(struct sockaddr *sa) {
 }
 
 int server_read(int new_fd, char * buf) {
+    // read the received buffer from the socket
     return recv(new_fd, buf, MAXDATASIZE-1, 0); 
 }
 
 int server_write(int new_fd, char * buf) {
+    // send the buffer to the socket
     return send(new_fd, buf, MAXDATASIZE-1, 0);
 }
 
@@ -39,6 +41,7 @@ int main(int argc, char *argv[]) {
     char buf[MAXDATASIZE];
 
     if (argc != 2) {
+        // check for correct usage
         fprintf(stderr, "usage: echos Port\n"); 
         exit(1);
     }
@@ -61,6 +64,7 @@ int main(int argc, char *argv[]) {
            continue;
         }
 
+        // allow other sockets to bind to this port
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
            perror("setsocketopt");
            exit(1);
@@ -75,6 +79,7 @@ int main(int argc, char *argv[]) {
         break;
     }
 
+    // we don't need it now
     freeaddrinfo(res);
 
     if (p == NULL) {
@@ -115,7 +120,6 @@ int main(int argc, char *argv[]) {
         printf("server: got conection from %s\n", str);
 
         if (!fork()) {
-            // close(sockfd);
             while (numbytes =  server_read(new_fd, buf)) {
                 if  (numbytes == -1 && errno == EINTR) {
                     continue;
@@ -144,9 +148,10 @@ int main(int argc, char *argv[]) {
 
                 printf("send: %s\n", buf);
             }
-
+            // client disconnected
             printf("TCP FIN received");
             fflush(stdout);
+            // let it go
             close(new_fd);
         }
     }

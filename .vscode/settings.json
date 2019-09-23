@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.kml": "xml",
-        "headers.h": "c"
+        "headers.h": "c",
+        "config.h": "c"
     }
 }

@@ -11,4 +11,4 @@ client: client.o $(DEPS)
 	$(C) -o client client.o
 	
 clean:
-	rm -f *.o *~ server client 
+	rm -f *.o server client 

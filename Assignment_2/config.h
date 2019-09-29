@@ -26,6 +26,6 @@ typedef struct
 
 typedef struct
 {
-    uint32_t vrsn_type_len;            //vrsn: 9 bits; type: 7 bits; len: 16 bits
+    uint32_t vrsn_type_len;             //vrsn: 9 bits; type: 7 bits; len: 16 bits
     sbcp_attribute_t *sbcp_attributes; // payload
 } sbcp_msg_t;

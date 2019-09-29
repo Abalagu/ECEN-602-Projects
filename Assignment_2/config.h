@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#define VRSN 3
 
 typedef enum
 {

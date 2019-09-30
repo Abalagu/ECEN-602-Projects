@@ -1,6 +1,25 @@
 #include "client_lib.h"
 
-sbcp_msg_t make_msg_send(char *message, size_t msg_len){
+sbcp_msg_t make_msg_ack()
+{
+}
+
+// bonus feature: REASON attribute
+sbcp_msg_t make_msg_nak(char *reason, size_t reason_len)
+{
+    sbcp_msg_t msg_nak = {0};
+    msg_nak.vrsn_type_len = (VRSN << 23 | SEND << 16 | sizeof(sbcp_msg_t));
+
+    // fill in reason part
+    msg_nak.sbcp_attributes[0].sbcp_attribute_type = REASON;
+    msg_nak.sbcp_attributes[0].len = reason_len;
+    memcpy(msg_nak.sbcp_attributes[0].payload, reason, reason_len);
+
+    return msg_nak;
+}
+
+sbcp_msg_t make_msg_send(char *message, size_t msg_len)
+{
     sbcp_msg_t msg_send = {0};
     msg_send.vrsn_type_len = (VRSN << 23 | SEND << 16 | sizeof(sbcp_msg_t));
 
@@ -16,26 +35,25 @@ sbcp_msg_t make_msg_fwd(char *message, size_t msg_len, char *username, size_t na
 {
     sbcp_msg_t msg_fwd = {0};
     msg_fwd.vrsn_type_len = (VRSN << 23 | FWD << 16 | sizeof(sbcp_msg_t));
-    
+
     // fill in message part
     msg_fwd.sbcp_attributes[0].sbcp_attribute_type = MESSAGE;
     msg_fwd.sbcp_attributes[0].len = msg_len;
     memcpy(msg_fwd.sbcp_attributes[0].payload, message, msg_len);
-    
+
     // fill in username part
     msg_fwd.sbcp_attributes[1].sbcp_attribute_type = USERNAME;
     msg_fwd.sbcp_attributes[1].len = name_len;
     memcpy(msg_fwd.sbcp_attributes[1].payload, username, name_len);
 
     return msg_fwd;
-
 }
 
 sbcp_msg_t make_msg_join(char *username, size_t name_len)
 {
     sbcp_msg_t msg_join = {0};
     msg_join.vrsn_type_len = (VRSN << 23 | JOIN << 16 | sizeof(sbcp_msg_t));
-    
+
     // fill in message part
     msg_join.sbcp_attributes[0].sbcp_attribute_type = USERNAME;
     msg_join.sbcp_attributes[0].len = name_len;

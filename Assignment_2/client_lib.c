@@ -1,21 +1,20 @@
 #include "client_lib.h"
 
-
-sbcp_msg_t make_msg_join(char *username)
+// len for payload length
+sbcp_msg_t make_msg_join(char *username, size_t len)
 {
-    sbcp_attribute_t *sbcp_attr_join = malloc(sizeof(sbcp_attribute_t));
+    sbcp_attribute_t *sbcp_attr_join = malloc(sizeof(sbcp_attribute_t) + len);
     sbcp_attr_join->sbcp_attribute_type = USERNAME;
-    sbcp_attr_join->payload = malloc(sizeof(username));
-    sbcp_attr_join->len = sizeof(*sbcp_attr_join);
+    memcpy(sbcp_attr_join->payload, username, len);
+    sbcp_attr_join->len = len + 4; //payload + 2 + 2
 
-    strcpy(sbcp_attr_join->payload, username);
-    sbcp_msg_t *msg_join = malloc(sizeof(sbcp_msg_t));
-    msg_join->sbcp_attributes = sbcp_attr_join;
-    msg_join->vrsn_type_len = (VRSN << 23 | JOIN << 16 | sizeof(*msg_join));
+    sbcp_msg_t *msg_join = malloc(sbcp_attr_join->len + sizeof(*sbcp_attr_join));
+    memcpy(msg_join->sbcp_attributes, sbcp_attr_join, sbcp_attr_join->len);
+    // msg_join->sbcp_attributes = sbcp_attr_join;
+    msg_join->vrsn_type_len = (VRSN << 23 | JOIN << 16 | sbcp_attr_join->len + 4);
 
     return *msg_join;
 }
-
 
 int writen(int sockfd, char *buf, size_t size_buf)
 {

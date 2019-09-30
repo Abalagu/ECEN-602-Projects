@@ -21,8 +21,8 @@
 #endif
 
 // parse version, type, and length
-void parse_vtl(uint32_t vtl);
+int parse_vtl(uint32_t vtl);
 
-void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute);
+void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute, size_t attr_len);
 
-void parse_msg_join(sbcp_msg_t msg_join);
+int parse_msg_join(sbcp_msg_t msg_join);

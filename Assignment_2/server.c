@@ -160,7 +160,9 @@ int main(int argc, char *argv[])
 
                 // struct exchange test: server
                 printf("recv size: %d\n", numbytes);
+                
                 sbcp_msg_t *msg = (sbcp_msg_t *)buf;
+                printf("sizeof msg: %ld\n", sizeof(*msg));
                 parse_msg_join(*msg);
                 // printf("recv: %s\n", buf);
 

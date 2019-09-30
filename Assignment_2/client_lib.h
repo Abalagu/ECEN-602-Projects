@@ -10,7 +10,7 @@
 
 
 
-sbcp_msg_t make_msg_join(char* username);
+sbcp_msg_t make_msg_join(char *username, size_t len);
 
 // int writen(int sockfd, char *buf);
 int writen(int sockfd, char *buf, size_t size_buf);

@@ -3,8 +3,10 @@
 int main(int argc, char *argv[])
 {
     printf("\n");
-    sbcp_msg_t msg_join = make_msg_join("luming");
-    parse_msg_join(msg_join);
+    char username[] = "lumingxuabalguasdasdsa";
+    sbcp_msg_t msg_join = make_msg_join(username, sizeof(username));
+    int msg_len = parse_msg_join(msg_join);
+    printf("msg len: %d\n", msg_len);
 
     // make simple connection to server
     int sock_fd;
@@ -18,10 +20,10 @@ int main(int argc, char *argv[])
 
     // struct exchange test: client
     char buf[MAXDATASIZE];
-    memcpy(buf, &msg_join, sizeof(msg_join));
-    writen(sock_fd, buf, sizeof(msg_join));
-    printf("sizeof buf: %ld\n", sizeof(buf));
-    printf("sizeof msg: %ld\n", sizeof(msg_join));
+    memcpy(buf, &msg_join, msg_len);
+    writen(sock_fd, buf, msg_len);
+    // printf("sizeof buf: %ld\n", sizeof(buf));
+    // printf("sizeof msg: %ld\n", sizeof(msg_join));
     
     while(1){
 

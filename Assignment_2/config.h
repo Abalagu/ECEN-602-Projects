@@ -19,17 +19,18 @@ typedef enum
     MESSAGE = 4
 } sbcp_attribute_type_t;
 
+// flexible array member, allocate memory into single block.
 typedef struct
 {
     uint16_t sbcp_attribute_type;
     uint16_t len;
-    char *payload;
+    char payload[];
 } sbcp_attribute_t;
 
 typedef struct
 {
     uint32_t vrsn_type_len;            //vrsn: 9 bits; type: 7 bits; len: 16 bits
-    sbcp_attribute_t *sbcp_attributes; // payload
+    sbcp_attribute_t sbcp_attributes[]; // payload
 } sbcp_msg_t;
 
 #endif

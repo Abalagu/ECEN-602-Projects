@@ -1,4 +1,4 @@
 rm client
 clear
 make client
-./client
+./client localhost 12345

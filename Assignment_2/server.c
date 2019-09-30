@@ -158,7 +158,13 @@ int main(int argc, char *argv[])
                     printf("TCP FIN received");
                 }
 
-                printf("recv: %s", buf);
+                // struct exchange test: server
+                printf("recv size: %d\n", numbytes);
+                sbcp_msg_t *msg = (sbcp_msg_t *)buf;
+                parse_msg_join(*msg);
+                // printf("recv: %s\n", buf);
+
+
 
                 // echo back
                 while ((numbytes = server_write(new_fd, buf) == -1 && errno == EINTR))

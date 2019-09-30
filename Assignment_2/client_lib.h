@@ -4,11 +4,16 @@
 #include "common_lib.h"
 #include "config.h"
 
+#define MAXDATASIZE 100
+
 #endif
+
+
 
 sbcp_msg_t make_msg_join(char* username);
 
-int writen(int sockfd, char *buf);
+// int writen(int sockfd, char *buf);
+int writen(int sockfd, char *buf, size_t size_buf);
 
 int readline(int sockfd, char *recvbuf);
 

@@ -4,4 +4,9 @@
 
 ## Luming
 
-## Goal: add join feature
+## Goal
+Exchange JOIN message
+
+## Execution:
+1. run ./run_server.sh
+2. run ./run_client.sh

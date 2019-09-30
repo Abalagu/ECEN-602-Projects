@@ -5,8 +5,12 @@ TARGETS = server client
 
 all: $(TARGETS)
 
-server: server.o server_lib.h common_lib.h
-	$(C) -o server server.o
+server: server.o server_lib.o common_lib.o
+	$(C) -o server server.o server_lib.o common_lib.o
+
+server.o : server.h
+
+server_lib.o : server_lib.h
 
 client : client.o client_lib.o common_lib.o
 	$(C) -o client client.o client_lib.o common_lib.o

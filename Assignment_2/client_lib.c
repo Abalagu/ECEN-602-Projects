@@ -1,5 +1,5 @@
 #include "client_lib.h"
-#define MAXDATASIZE 100
+
 
 sbcp_msg_t make_msg_join(char *username)
 {
@@ -17,10 +17,10 @@ sbcp_msg_t make_msg_join(char *username)
 }
 
 
-int writen(int sockfd, char *buf)
+int writen(int sockfd, char *buf, size_t size_buf)
 {
     int numbytes;
-    while ((numbytes = send(sockfd, buf, MAXDATASIZE - 1, 0)) == -1 && errno == EINTR)
+    while ((numbytes = send(sockfd, buf, size_buf, 0)) == -1 && errno == EINTR)
     {
         // manually restarting
         continue;
@@ -54,7 +54,7 @@ int server_lookup_connect(char *host, char *server_port)
     if ((status = getaddrinfo(host, server_port, &hints, &server_info)) != 0)
     {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-        return 2;
+        return -2;
     }
 
     for (p = server_info; p != NULL; p = p->ai_next)
@@ -77,7 +77,7 @@ int server_lookup_connect(char *host, char *server_port)
     if (p == NULL)
     {
         fprintf(stderr, "client: failed to connect\n");
-        return 2;
+        return -2;
     }
 
     printf("client: connected to %s:%s\n", host, server_port);

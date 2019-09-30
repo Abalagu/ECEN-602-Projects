@@ -1,7 +1,7 @@
 #include "server.h"
 
 #define BACKLOG 10
-#define MAXDATASIZE 100
+#define MAXDATASIZE 1500
 
 // function taken from beej's guide
 void sigchild_handler(int s)

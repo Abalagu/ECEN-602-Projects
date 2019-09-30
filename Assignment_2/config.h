@@ -23,13 +23,13 @@ typedef struct
 {
     uint16_t sbcp_attribute_type;
     uint16_t len;
-    char *payload;
+    char payload[512];
 } sbcp_attribute_t;
 
 typedef struct
 {
     uint32_t vrsn_type_len;            //vrsn: 9 bits; type: 7 bits; len: 16 bits
-    sbcp_attribute_t *sbcp_attributes; // payload
+    sbcp_attribute_t sbcp_attributes[2]; // payload
 } sbcp_msg_t;
 
 #endif

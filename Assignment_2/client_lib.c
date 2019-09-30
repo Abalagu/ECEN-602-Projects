@@ -1,25 +1,45 @@
 #include "client_lib.h"
 
-sbcp_msg_t make_msg_join(char *username, size_t payload_len)
+sbcp_msg_t make_msg_send(char *message, size_t msg_len){
+    sbcp_msg_t msg_send = {0};
+    msg_send.vrsn_type_len = (VRSN << 23 | SEND << 16 | sizeof(sbcp_msg_t));
+
+    // fill in message part
+    msg_send.sbcp_attributes[0].sbcp_attribute_type = MESSAGE;
+    msg_send.sbcp_attributes[0].len = msg_len;
+    memcpy(msg_send.sbcp_attributes[0].payload, message, msg_len);
+
+    return msg_send;
+}
+
+sbcp_msg_t make_msg_fwd(char *message, size_t msg_len, char *username, size_t name_len)
 {
-    sbcp_attribute_t *sbcp_attr_join = malloc(sizeof(sbcp_attribute_t));
-    printf("sizeof struct: %ld\n", sizeof(*sbcp_attr_join));
-    sbcp_attr_join->sbcp_attribute_type = USERNAME;
-    sbcp_attr_join->len = sizeof(sbcp_attribute_t);
-    printf("sizeof payload: %ld\n", sizeof(sbcp_attr_join->payload));
-    memcpy(sbcp_attr_join->payload, username, payload_len);
+    sbcp_msg_t msg_fwd = {0};
+    msg_fwd.vrsn_type_len = (VRSN << 23 | FWD << 16 | sizeof(sbcp_msg_t));
+    
+    // fill in message part
+    msg_fwd.sbcp_attributes[0].sbcp_attribute_type = MESSAGE;
+    msg_fwd.sbcp_attributes[0].len = msg_len;
+    memcpy(msg_fwd.sbcp_attributes[0].payload, message, msg_len);
+    
+    // fill in username part
+    msg_fwd.sbcp_attributes[1].sbcp_attribute_type = USERNAME;
+    msg_fwd.sbcp_attributes[1].len = name_len;
+    memcpy(msg_fwd.sbcp_attributes[1].payload, username, name_len);
 
-    // sbcp_attr_join->len = sizeof(*sbcp_attr_join);
+    return msg_fwd;
 
-    // strcpy(sbcp_attr_join->payload, username);
-    // sbcp_msg_t *msg_join = malloc(sizeof(sbcp_msg_t));
-    // msg_join->sbcp_attributes = sbcp_attr_join;
+}
 
-    sbcp_msg_t msg_join = {0}; //struct init to 0
-    printf("sizeof msg: %ld\n", sizeof(msg_join));
-    msg_join.sbcp_attributes[0] = *sbcp_attr_join;
-    msg_join.sbcp_attributes[1] = *sbcp_attr_join;
+sbcp_msg_t make_msg_join(char *username, size_t name_len)
+{
+    sbcp_msg_t msg_join = {0};
     msg_join.vrsn_type_len = (VRSN << 23 | JOIN << 16 | sizeof(sbcp_msg_t));
+    
+    // fill in message part
+    msg_join.sbcp_attributes[0].sbcp_attribute_type = USERNAME;
+    msg_join.sbcp_attributes[0].len = name_len;
+    memcpy(msg_join.sbcp_attributes[0].payload, username, name_len);
 
     return msg_join;
 }

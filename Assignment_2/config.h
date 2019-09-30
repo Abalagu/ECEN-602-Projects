@@ -22,7 +22,7 @@ typedef enum
 typedef struct
 {
     uint16_t sbcp_attribute_type;
-    uint16_t len;
+    uint16_t len; //record written payload size
     char payload[512];
 } sbcp_attribute_t;
 

@@ -4,8 +4,10 @@ int main(int argc, char *argv[])
 {
     printf("\n");
     char username[] = "luming";
+    char message[] = "hello world!";
     sbcp_msg_t msg_join = make_msg_join(username, sizeof(username));
-    parse_msg_join(msg_join);
+    sbcp_msg_t msg_fwd = make_msg_fwd(message, sizeof(message), username, sizeof(username));
+    parse_msg_join(msg_fwd);
 
     // early return to skip socket
     // return 0;
@@ -23,8 +25,8 @@ int main(int argc, char *argv[])
     // struct exchange test: client
     char buf[MAXDATASIZE];
     printf("sizeof msg join: %ld\n", sizeof(msg_join));
-    memcpy(buf, &msg_join, sizeof(msg_join));
-    writen(sock_fd, buf, sizeof(msg_join));
+    memcpy(buf, &msg_fwd, sizeof(msg_fwd));
+    writen(sock_fd, buf, sizeof(msg_fwd));
     printf("sizeof buf: %ld\n", sizeof(buf));
     printf("sizeof msg: %ld\n", sizeof(msg_join));
     

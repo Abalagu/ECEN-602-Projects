@@ -15,7 +15,7 @@ void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute)
 {
     if(sbcp_attribute.sbcp_attribute_type == 0){
         printf("empty attribute\n");
-        return 0;
+        return;
     }
     printf("sizeof sbcp_attr: %ld\n", sizeof(sbcp_attribute));
     printf("    attribute len: %d\n", sbcp_attribute.len);

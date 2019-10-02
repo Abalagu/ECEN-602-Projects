@@ -136,17 +136,17 @@ int main(int argc, char *argv[]) {
 
                 printf("recv: %s", buf);
 
-                // echo back
-                while ((numbytes = server_write(new_fd, buf) == -1 && errno == EINTR)) {
-                    continue;
-                }
+                // // echo back
+                // while ((numbytes = server_write(new_fd, buf) == -1 && errno == EINTR)) {
+                //     continue;
+                // }
 
-                if (numbytes == -1) {
-                    perror("send");
-                    exit(1);
-                }
+                // if (numbytes == -1) {
+                //     perror("send");
+                //     exit(1);
+                // }
 
-                printf("send: %s\n", buf);
+                // printf("send: %s\n", buf);
             }
             // client disconnected
             printf("TCP FIN received");

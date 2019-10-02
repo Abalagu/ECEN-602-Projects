@@ -1,7 +1,17 @@
 #include "client_lib.h"
 
-sbcp_msg_t make_msg_ack()
+// count should be inclusive of the requestor
+sbcp_msg_t make_msg_ack(int count, char *clients)
 {
+    sbcp_msg_t msg_ack = {0};
+    msg_ack.vrsn_type_len = (VRSN << 23 | ACK << 16 | sizeof(sbcp_msg_t));
+
+    // fill in reason part
+    msg_ack.sbcp_attributes[0].sbcp_attribute_type = CLIENTCOUNT;
+    msg_ack.sbcp_attributes[0].len = sizeof(count);
+    memcpy(msg_ack.sbcp_attributes[0].payload, count, sizeof(count));
+
+    return msg_ack;
 }
 
 // bonus feature: REASON attribute

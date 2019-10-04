@@ -86,12 +86,14 @@ sbcp_msg_t make_msg_online(char *username, size_t name_len) {
   return msg_online;
 }
 
-// idle message from server fwd to clients
+// idle message with username from server fwd to clients
 sbcp_msg_t make_msg_idle_s(char *username, size_t name_len) {
   sbcp_msg_t msg_idle = {0};
   msg_idle.vrsn_type_len = (VRSN << 23 | IDLE << 16 | sizeof(sbcp_msg_t));
-  // msg with empty attributes
-
+  // fill in username
+  msg_idle.sbcp_attributes[0].sbcp_attribute_type = USERNAME;
+  msg_idle.sbcp_attributes[0].len = name_len;
+  memcpy(msg_idle.sbcp_attributes[0].payload, username, name_len);
   return msg_idle;
 }
 
@@ -101,3 +103,7 @@ void parse_msg_join(sbcp_msg_t msg_join) {
   parse_sbcp_attribute(msg_join.sbcp_attributes[0]);
   parse_sbcp_attribute(msg_join.sbcp_attributes[1]);
 }
+
+void parse_msg_idle(sbcp_msg_t msg_idle) {}
+
+void parse_msg_send(sbcp_msg_t msg_send) {}

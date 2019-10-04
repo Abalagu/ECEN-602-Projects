@@ -38,15 +38,12 @@ sbcp_msg_t make_msg_send(char *message, size_t msg_len) {
   return msg_send;
 }
 
-// idle message from client to server
+// idle message with empty attribute from client to server
 sbcp_msg_t make_msg_idle_c(char *username, size_t name_len) {
   sbcp_msg_t msg_idle = {0};
   msg_idle.vrsn_type_len = (VRSN << 23 | IDLE << 16 | sizeof(sbcp_msg_t));
 
-  // fill in username
-  msg_idle.sbcp_attributes[0].sbcp_attribute_type = USERNAME;
-  msg_idle.sbcp_attributes[0].len = name_len;
-  memcpy(msg_idle.sbcp_attributes[0].payload, username, name_len);
+  // msg with empty attributes
 
   return msg_idle;
 }
@@ -57,6 +54,10 @@ void parse_msg_nak(sbcp_msg_t msg_nak) {
   } else {
     printf("ATTRIBUTE ERROR. EXPECT REASON.\n");
   }
+}
+
+void parse_msg_offline(sbcp_msg_t msg_offline) {
+  printf("user %s is offline.\n", msg_offline.sbcp_attributes[0].payload);
 }
 
 void parse_msg_ack(sbcp_msg_t msg_ack) {
@@ -75,6 +76,13 @@ void parse_msg_ack(sbcp_msg_t msg_ack) {
   }
 }
 
+void parse_msg_online(sbcp_msg_t msg_online) {
+  printf("user %s is back online.\n", msg_online.sbcp_attributes[0].payload);
+}
+
+void parse_msg_idle(sbcp_msg_t msg_idle) {
+  printf("%s is idle.\n", msg_idle.sbcp_attributes[0].payload);
+}
 int writen(int sockfd, char *buf, size_t size_buf) {
   int numbytes;
   while ((numbytes = send(sockfd, buf, size_buf, 0)) == -1 && errno == EINTR) {

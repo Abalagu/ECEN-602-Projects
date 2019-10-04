@@ -25,12 +25,6 @@ void print_hex(char *array);
 int get_msg_type(sbcp_msg_t msg);
 
 // parse version, type, and length
-int parse_vtl(uint32_t vtl);
+void parse_vtl(uint32_t vtl);
 
-<<<<<<< HEAD
-void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute, size_t attr_len);
-
-int parse_msg_join(sbcp_msg_t msg_join);
-=======
 void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute);
->>>>>>> b2f8ac1901784d4524198d4da2df1d3d74e412b8

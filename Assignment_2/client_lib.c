@@ -1,19 +1,5 @@
 #include "client_lib.h"
 
-<<<<<<< HEAD
-// len for payload length
-sbcp_msg_t make_msg_join(char *username, size_t len)
-{
-    sbcp_attribute_t *sbcp_attr_join = malloc(sizeof(sbcp_attribute_t) + len);
-    sbcp_attr_join->sbcp_attribute_type = USERNAME;
-    memcpy(sbcp_attr_join->payload, username, len);
-    sbcp_attr_join->len = len + 4; //payload + 2 + 2
-
-    sbcp_msg_t *msg_join = malloc(sbcp_attr_join->len + sizeof(*sbcp_attr_join));
-    memcpy(msg_join->sbcp_attributes, sbcp_attr_join, sbcp_attr_join->len);
-    // msg_join->sbcp_attributes = sbcp_attr_join;
-    msg_join->vrsn_type_len = (VRSN << 23 | JOIN << 16 | sbcp_attr_join->len + 4);
-=======
 // print multiple username from 1-d buffer
 void print_usernames(char *buf) {
   // each username has 16 bytes space
@@ -36,22 +22,10 @@ sbcp_msg_t make_msg_join(char *username, size_t name_len) {
   msg_join.sbcp_attributes[0].sbcp_attribute_type = USERNAME;
   msg_join.sbcp_attributes[0].len = name_len;
   memcpy(msg_join.sbcp_attributes[0].payload, username, name_len);
->>>>>>> b2f8ac1901784d4524198d4da2df1d3d74e412b8
 
   return msg_join;
 }
 
-<<<<<<< HEAD
-int writen(int sockfd, char *buf, size_t size_buf)
-{
-    int numbytes;
-    while ((numbytes = send(sockfd, buf, size_buf, 0)) == -1 && errno == EINTR)
-    {
-        // manually restarting
-        continue;
-    }
-    return numbytes;
-=======
 sbcp_msg_t make_msg_send(char *message, size_t msg_len) {
   sbcp_msg_t msg_send = {0};
   msg_send.vrsn_type_len = (VRSN << 23 | SEND << 16 | sizeof(sbcp_msg_t));
@@ -62,7 +36,6 @@ sbcp_msg_t make_msg_send(char *message, size_t msg_len) {
   memcpy(msg_send.sbcp_attributes[0].payload, message, msg_len);
 
   return msg_send;
->>>>>>> b2f8ac1901784d4524198d4da2df1d3d74e412b8
 }
 
 // idle message with empty attribute from client to server

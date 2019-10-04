@@ -2,7 +2,9 @@
 #define CONFIG_H_
 
 #include <stdint.h>
+
 #define VRSN 3
+#define MAXDATASIZE 1500
 
 typedef enum
 {

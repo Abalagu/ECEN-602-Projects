@@ -4,9 +4,7 @@
 #include "common_lib.h"
 #include "config.h"
 
-#define MAXDATASIZE 1500
 
-#endif
 void print_usernames(char *buf);
 
 sbcp_msg_t make_msg_join(char *username, size_t payload_len);
@@ -28,3 +26,5 @@ int server_lookup_connect(char *host, char *server_port);
 
 // print multiple username from 1-d buffer
 // void print_usernames(char *buf);
+
+#endif

@@ -5,22 +5,21 @@ void parse_vtl(uint32_t vtl)
 {
     int version = vtl >> 23;
     int type = (vtl >> 16) & 0b0000000001111111;
-    printf("sizeof vtl: %ld\n", sizeof(vtl));
-    printf("    vrsn: %d\n", version);
-    printf("    type: %d\n", type);
-    printf("    len: %d\n", vtl & 0xFFFF);
+    printf("    HEADER: vrsn: %d, type: %d, len: %d\n", version, type, vtl & 0xFFFF);
+    
 }
 
 void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute)
 {
-    if(sbcp_attribute.sbcp_attribute_type == 0){
-        printf("empty attribute\n");
+    if (sbcp_attribute.sbcp_attribute_type == 0)
+    {
+        printf("    !empty attribute\n");
         return;
     }
-    printf("sizeof sbcp_attr: %ld\n", sizeof(sbcp_attribute));
-    printf("    attribute len: %d\n", sbcp_attribute.len);
-    printf("    attribute type: %d\n", sbcp_attribute.sbcp_attribute_type);
-    printf("    attribute payload: %s\n", sbcp_attribute.payload);
+    printf("    ATTRIBUTE: %d, %d, %s\n",
+           sbcp_attribute.len,
+           sbcp_attribute.sbcp_attribute_type,
+           sbcp_attribute.payload);
 }
 
 void parse_msg_join(sbcp_msg_t msg_join)
@@ -29,4 +28,11 @@ void parse_msg_join(sbcp_msg_t msg_join)
     parse_vtl(msg_join.vrsn_type_len);
     parse_sbcp_attribute(msg_join.sbcp_attributes[0]);
     parse_sbcp_attribute(msg_join.sbcp_attributes[1]);
+}
+
+void parse_msg_ack(sbcp_msg_t msg_ack)
+{
+    parse_vtl(msg_ack.vrsn_type_len);
+    parse_sbcp_attribute(msg_ack.sbcp_attributes[0]);
+    parse_sbcp_attribute(msg_ack.sbcp_attributes[1]);
 }

@@ -6,8 +6,8 @@ int main(int argc, char *argv[])
     char username[] = "luming";
     char message[] = "hello world!";
     sbcp_msg_t msg_join = make_msg_join(username, sizeof(username));
-    sbcp_msg_t msg_fwd = make_msg_fwd(message, sizeof(message), username, sizeof(username));
-    parse_msg_join(msg_fwd);
+    // sbcp_msg_t msg_join = make_msg_join(message, sizeof(message), username, sizeof(username));
+    parse_msg_join(msg_join);
 
     // early return to skip socket
     // return 0;
@@ -24,11 +24,15 @@ int main(int argc, char *argv[])
 
     // struct exchange test: client
     char buf[MAXDATASIZE];
-    printf("sizeof msg join: %ld\n", sizeof(msg_join));
-    memcpy(buf, &msg_fwd, sizeof(msg_fwd));
-    writen(sock_fd, buf, sizeof(msg_fwd));
-    printf("sizeof buf: %ld\n", sizeof(buf));
-    printf("sizeof msg: %ld\n", sizeof(msg_join));
+    char recv_buf[MAXDATASIZE];
+    // printf("sizeof msg join: %ld\n", sizeof(msg_join));
+    memcpy(buf, &msg_join, sizeof(msg_join));
+    writen(sock_fd, buf, sizeof(msg_join));
+    readline(sock_fd, recv_buf);
+    sbcp_msg_t *msg = (sbcp_msg_t*)recv_buf;
+    parse_msg_ack(*msg);
+    // printf("sizeof buf: %ld\n", sizeof(buf));
+    // printf("sizeof msg: %ld\n", sizeof(msg_join));
     
     while(1){
 

@@ -19,3 +19,5 @@ sbcp_msg_t make_msg_online(char *username, size_t name_len);
 sbcp_msg_t make_msg_idle_s(char *username, size_t name_len);
 
 char *str_join(char *buf, char string_array[10][16]);
+
+void parse_msg_join(sbcp_msg_t msg_join);

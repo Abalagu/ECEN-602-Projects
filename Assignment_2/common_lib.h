@@ -5,16 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <errno.h>
-#include <unistd.h>
-#include <netdb.h>
 #include <arpa/inet.h>
-#include <sys/wait.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
+#include <errno.h>
 #include <netdb.h>
-#include <sys/types.h>
+#include <netinet/in.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "config.h"
 
@@ -22,13 +21,10 @@
 
 void print_hex(char *array);
 
-void print_usernames(char *buf);
+// get header from msg
+int get_msg_type(sbcp_msg_t msg);
 
 // parse version, type, and length
 void parse_vtl(uint32_t vtl);
 
 void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute);
-
-void parse_msg_join(sbcp_msg_t msg_join);
-
-void parse_msg_ack(sbcp_msg_t msg_ack);

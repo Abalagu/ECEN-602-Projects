@@ -16,7 +16,8 @@ int main(int argc, char *argv[])
     int sock_fd;
     char *host = "localhost", *server_port = "12345";
     sock_fd = server_lookup_connect(host, server_port);
-    if(sock_fd < 0){
+    if (sock_fd < 0)
+    {
         printf("connection error.\n");
         return 1;
     }
@@ -29,13 +30,13 @@ int main(int argc, char *argv[])
     memcpy(buf, &msg_join, sizeof(msg_join));
     writen(sock_fd, buf, sizeof(msg_join));
     readline(sock_fd, recv_buf);
-    sbcp_msg_t *msg = (sbcp_msg_t*)recv_buf;
+    sbcp_msg_t *msg = (sbcp_msg_t *)recv_buf;
     parse_msg_ack(*msg);
     // printf("sizeof buf: %ld\n", sizeof(buf));
     // printf("sizeof msg: %ld\n", sizeof(msg_join));
-    
-    while(1){
 
+    while (1)
+    {
     }
     return 0;
 }

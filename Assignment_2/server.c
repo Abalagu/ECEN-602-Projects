@@ -158,12 +158,19 @@ int main(int argc, char *argv[])
                     printf("TCP FIN received");
                 }
 
+                // fill in test usernames
+                char usernames[10][16] = {0};
+                strcpy(usernames[0], "Akhilesh");
+                strcpy(usernames[1], "Luming");
+                strcpy(usernames[2], "P.Cantrell");
+
                 // struct exchange test: server
                 printf("recv size: %d\n", numbytes);
-                sbcp_msg_t *msg = (sbcp_msg_t *)buf;
-                parse_msg_join(*msg);
-                sbcp_msg_t msg_ack = make_msg_ack(1, "luming");
-                // printf("recv: %s\n", buf);
+
+                sbcp_msg_t *msg_join = (sbcp_msg_t *)buf;
+                parse_msg_join(*msg_join);
+                sbcp_msg_t msg_ack = make_msg_ack(1, usernames);
+
                 memcpy(buf, &msg_ack, sizeof(msg_ack));
                 printf("sent ACK\n");
                 // echo back

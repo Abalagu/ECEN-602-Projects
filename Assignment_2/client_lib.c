@@ -40,6 +40,8 @@ sbcp_msg_t make_msg_idle_c(char *username, size_t name_len)
     return msg_idle;
 }
 
+
+
 int writen(int sockfd, char *buf, size_t size_buf)
 {
     int numbytes;

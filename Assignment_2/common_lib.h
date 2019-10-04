@@ -20,6 +20,10 @@
 
 #endif
 
+void print_hex(char *array);
+
+void print_usernames(char *buf);
+
 // parse version, type, and length
 void parse_vtl(uint32_t vtl);
 

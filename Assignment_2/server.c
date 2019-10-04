@@ -162,10 +162,10 @@ int main(int argc, char *argv[])
                 printf("recv size: %d\n", numbytes);
                 sbcp_msg_t *msg = (sbcp_msg_t *)buf;
                 parse_msg_join(*msg);
+                sbcp_msg_t msg_ack = make_msg_ack(1, "luming");
                 // printf("recv: %s\n", buf);
-
-
-
+                memcpy(buf, &msg_ack, sizeof(msg_ack));
+                printf("sent ACK\n");
                 // echo back
                 while ((numbytes = server_write(new_fd, buf) == -1 && errno == EINTR))
                 {
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
 
-                printf("send: %s\n", buf);
+                // printf("send: %s\n", buf);
             }
             // client disconnected
             printf("TCP FIN received");

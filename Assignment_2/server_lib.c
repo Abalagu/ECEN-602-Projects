@@ -19,7 +19,6 @@ void fd_select(fd_set *readfds, socket_fd_t listen_fd) {
     node = node->next;
   }
   select(max_fd + 1, readfds, NULL, NULL, &tv);
-  printf("after select call.\n");
 }
 
 /* Given a reference (pointer to pointer) to the head
@@ -157,15 +156,11 @@ sbcp_msg_t make_msg_idle_s(char *username, size_t name_len) {
   return msg_idle;
 }
 
-void parse_msg_join(sbcp_msg_t msg_join) {
+void parse_msg_join(sbcp_msg_t msg_join, char *new_name) {
   if (msg_join.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
-    printf("%s want to join the chat.\n", msg_join.sbcp_attributes[0].payload);
+    memcpy(new_name, msg_join.sbcp_attributes[0].payload, 16);
+    printf("%s want to join the chat.\n", new_name);
   }
-
-  // printf("sizeof msg: %ld\n", sizeof(msg_join));
-  // parse_vtl(msg_join.vrsn_type_len);
-  // parse_sbcp_attribute(msg_join.sbcp_attributes[0]);
-  // parse_sbcp_attribute(msg_join.sbcp_attributes[1]);
 }
 
 void parse_msg_idle(sbcp_msg_t msg_idle) {}
@@ -186,6 +181,20 @@ void get_usernames(char *usernames, socket_fd_t *listen_fd) {
   }
 }
 
+// remove node from linked list of socket fds
+void remove_node(socket_fd_t *listen_fd, socket_fd_t remove_node) {
+  socket_fd_t *node = listen_fd;
+  while (node != NULL) {
+    // if next node is to be removed
+    if (node->next->fd == remove_node.fd) {
+      // link node next to remove node to its parent
+      node->next = remove_node.next;
+      return;
+    } else {
+      node = node->next;
+    }
+  }
+}
 // traverse through all nodes, recv possible msg
 void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char buf[MAXDATASIZE];
@@ -195,15 +204,21 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
 
   sbcp_msg_t msg_send, *msg_recv;
 
+  if (FD_ISSET(listen_fd->fd, &readfds)) {  // incoming new connection
+    new_fd = connect_client(listen_fd->fd);
+    printf("new client connects.");
+    append_node(&listen_fd, new_fd, "");
+  }
+
   socket_fd_t *node = listen_fd->next;
   while (node != NULL) {
-
     if (FD_ISSET(node->fd, &readfds)) {  // a client sends msg
       printf("select on a node\n");
       numbytes = server_read(node->fd, buf);
       if (numbytes == 0) {
         printf("FIN received.\n");
-        close(node->fd); //handle disconnection. should remove from node
+        close(node->fd);  // handle disconnection. should remove from node
+        remove_node(listen_fd, *node);
         // return;  // temporary handle of disconnection
       }
 
@@ -219,8 +234,12 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
         server_write(node->fd, buf);
       }
 
+      char new_name[16];
       if (msg_type == JOIN) {  // msg join, add to node
-        parse_msg_join(*msg_recv);
+        parse_msg_join(*msg_recv, new_name);
+        printf("newname: %s\n", new_name);
+        memcpy(node->username, new_name, 16);
+
         get_usernames(usernames, listen_fd);
         msg_send = make_msg_ack(1, usernames);
         char reason[] = "same username";

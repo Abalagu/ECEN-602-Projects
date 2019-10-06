@@ -37,7 +37,7 @@ sbcp_msg_t make_msg_idle_s(char *username, size_t name_len);
 
 char *str_join(char *buf, char string_array[10][16]);
 
-void parse_msg_join(sbcp_msg_t msg_join);
+void parse_msg_join(sbcp_msg_t msg_join, char *new_name);
 
 void parse_msg_send(sbcp_msg_t msg_send);
 

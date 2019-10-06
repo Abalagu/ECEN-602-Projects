@@ -35,17 +35,6 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    if (FD_ISSET(sockfd, &readfds)) {  // incoming new connection
-      new_fd = connect_client(sockfd);
-      printf("new client connects.");
-      append_node(&listen_fd, new_fd, "");
-      // fill in test usernames
-      char usernames[10][16] = {0};
-      strcpy(usernames[0], "Akhilesh");
-      strcpy(usernames[1], "Luming");
-      strcpy(usernames[2], "P.Cantrell");
-
-    }
 
     msg_router(listen_fd, readfds);
     

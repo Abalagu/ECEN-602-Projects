@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     parse_msg_nak(*msg);
     return 0;  // retry with different username
   } else {
-    printf("message type error\n");
+    printf("message type error: %d\n", msg_type);
     return 0;  // routine error
   }
   // add select in client read from stdin or socket fd

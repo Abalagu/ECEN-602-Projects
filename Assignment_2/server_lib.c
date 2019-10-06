@@ -2,6 +2,26 @@
 
 //-------- SOCKET FD MANAGEMENT --------
 
+void fd_select(fd_set *readfds, socket_fd_t listen_fd) {
+  int max_fd;
+  struct timeval tv;
+  FD_ZERO(readfds);
+  FD_SET(listen_fd.fd, readfds);
+
+  tv.tv_sec = 2;
+  tv.tv_usec = 500000;
+  socket_fd_t *node = &listen_fd;
+
+  // traverse through all fds, get max fd and call select
+  while (node != NULL) {
+    FD_SET(node->fd, readfds);
+    max_fd = (max_fd > node->fd) ? max_fd : node->fd;
+    node = node->next;
+  }
+  select(max_fd + 1, readfds, NULL, NULL, &tv);
+  printf("after select call.\n");
+}
+
 /* Given a reference (pointer to pointer) to the head
 of a list and an int, appends a new node at the end */
 void append_node(socket_fd_t **head_ref, int new_fd, char *new_username) {
@@ -95,7 +115,7 @@ sbcp_msg_t make_msg_offline(char *username, size_t name_len) {
 }
 
 // count should be inclusive of the requestor
-sbcp_msg_t make_msg_ack(int count, char usernames[10][16]) {
+sbcp_msg_t make_msg_ack(int count, char *usernames) {
   sbcp_msg_t msg_ack = {0};
   msg_ack.vrsn_type_len = (VRSN << 23 | ACK << 16 | sizeof(sbcp_msg_t));
 
@@ -109,8 +129,7 @@ sbcp_msg_t make_msg_ack(int count, char usernames[10][16]) {
   // fill in client names
   msg_ack.sbcp_attributes[1].sbcp_attribute_type = USERNAME;
   msg_ack.sbcp_attributes[1].len = sizeof(160);
-
-  str_join(msg_ack.sbcp_attributes[1].payload, usernames);
+  memcpy(msg_ack.sbcp_attributes[1].payload, usernames, 170);
 
   return msg_ack;
 }
@@ -153,6 +172,68 @@ void parse_msg_idle(sbcp_msg_t msg_idle) {}
 
 void parse_msg_send(sbcp_msg_t msg_send) {
   printf("msg: %s\n", msg_send.sbcp_attributes[0].payload);
+}
+
+// flatten usernames in nodes to char array
+void get_usernames(char *usernames, socket_fd_t *listen_fd) {
+  memset(usernames, 0, sizeof(usernames));
+  socket_fd_t *node = listen_fd->next;
+  int count = 0;
+  while (node != NULL) {
+    memcpy(usernames + count * 16, node->username, 16);
+    count += 1;
+    node = node->next;
+  }
+}
+
+// traverse through all nodes, recv possible msg
+void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
+  char buf[MAXDATASIZE];
+  int new_fd;
+  int numbytes, msg_type;
+  char usernames[512] = {0};
+
+  sbcp_msg_t msg_send, *msg_recv;
+
+  socket_fd_t *node = listen_fd->next;
+  while (node != NULL) {
+
+    if (FD_ISSET(node->fd, &readfds)) {  // a client sends msg
+      printf("select on a node\n");
+      numbytes = server_read(node->fd, buf);
+      if (numbytes == 0) {
+        printf("FIN received.\n");
+        close(node->fd); //handle disconnection. should remove from node
+        // return;  // temporary handle of disconnection
+      }
+
+      // cast buffer to message
+      msg_recv = (sbcp_msg_t *)buf;
+      msg_type = get_msg_type(*msg_recv);
+      if (msg_type == SEND) {  // msg send, fwd to others
+        parse_msg_send(*msg_recv);
+        msg_send = make_msg_fwd(msg_recv->sbcp_attributes[0].payload,
+                                sizeof(msg_recv->sbcp_attributes[0].payload),
+                                "luming", 7);
+        memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
+        server_write(node->fd, buf);
+      }
+
+      if (msg_type == JOIN) {  // msg join, add to node
+        parse_msg_join(*msg_recv);
+        get_usernames(usernames, listen_fd);
+        msg_send = make_msg_ack(1, usernames);
+        char reason[] = "same username";
+        // *msg_send = make_msg_nak(reason, sizeof(reason));
+        // memcpy(buf, &msg_nak, sizeof(msg_nak)); //SEND NAK TEST
+        memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
+
+        numbytes = server_write(node->fd, buf);
+        printf("sent ACK\n");
+      }
+    }  // if fd in node is set
+    node = node->next;
+  }  // client node traversal
 }
 
 // function taken from beej's guide

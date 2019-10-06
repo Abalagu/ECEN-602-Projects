@@ -14,6 +14,10 @@ typedef struct socket_fd_t {
   struct socket_fd_t *next;
 } socket_fd_t;
 
+void fd_select(fd_set *readfds, socket_fd_t listen_fd);
+
+void msg_router(socket_fd_t *listen_fd, fd_set readfds);
+
 void append_node(socket_fd_t **head_ref, int new_fd, char *new_username);
 
 void print_nodes(socket_fd_t *node);
@@ -25,7 +29,7 @@ sbcp_msg_t make_msg_nak(char *reason, size_t reason_len);
 
 sbcp_msg_t make_msg_offline(char *username, size_t name_len);
 
-sbcp_msg_t make_msg_ack(int count, char usernames[10][16]);
+sbcp_msg_t make_msg_ack(int count, char *usernames);
 
 sbcp_msg_t make_msg_online(char *username, size_t name_len);
 

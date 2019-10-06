@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
       memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
       writen(sock_fd, buf, sizeof(sbcp_msg_t));
     }
+    
     if (FD_ISSET(sock_fd, &readfds)) {
       printf("select socket.\n");
       numbytes = readline(sock_fd, recv_buf);

@@ -165,8 +165,9 @@ void parse_msg_join(sbcp_msg_t msg_join, char *new_name) {
 
 void parse_msg_idle(sbcp_msg_t msg_idle) {}
 
-void parse_msg_send(sbcp_msg_t msg_send) {
-  printf("msg: %s\n", msg_send.sbcp_attributes[0].payload);
+void parse_msg_send(sbcp_msg_t msg_send, char *client_message) {
+  memcpy(client_message, msg_send.sbcp_attributes[0].payload, 512);
+  // printf("msg: %s\n", );
 }
 
 // flatten usernames in nodes to char array
@@ -195,12 +196,45 @@ void remove_node(socket_fd_t *listen_fd, socket_fd_t remove_node) {
     }
   }
 }
+
+// given current node, head node, and message, broadcast message to all other
+// nodes
+void msg_broadcast(socket_fd_t *current_node, socket_fd_t *head,
+                   sbcp_msg_t *msg_recv) {
+
+  char buf[MAXDATASIZE];
+  char client_chat[512] = {0};
+
+  parse_msg_send(*msg_recv, client_chat);
+  printf("%s: %s\n", current_node->username, client_chat);
+  sbcp_msg_t msg_send =
+      make_msg_fwd(client_chat, 512, current_node->username,
+                   strlen(current_node->username) + 1);
+
+  memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
+
+  // record current node fd, skip sending to message origin
+  // head node is server
+  int message_origin_fd = current_node->fd;
+  socket_fd_t *node = head->next;
+  while (node != NULL) {
+    if (node->fd != message_origin_fd) {     // if not from origin
+      server_write(node->fd, buf);  // broadcast to others
+      printf("send to %s\n", node->username);
+    }
+    node = node->next;
+  }
+  printf("broadcast end\n");
+}
+
 // traverse through all nodes, recv possible msg
 void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char buf[MAXDATASIZE];
   int new_fd;
   int numbytes, msg_type;
   char usernames[512] = {0};
+  char new_name[16];
+  int message_origin_fd = -1;
 
   sbcp_msg_t msg_send, *msg_recv;
 
@@ -226,15 +260,10 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
       msg_recv = (sbcp_msg_t *)buf;
       msg_type = get_msg_type(*msg_recv);
       if (msg_type == SEND) {  // msg send, fwd to others
-        parse_msg_send(*msg_recv);
-        msg_send = make_msg_fwd(msg_recv->sbcp_attributes[0].payload,
-                                sizeof(msg_recv->sbcp_attributes[0].payload),
-                                "luming", 7);
-        memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
-        server_write(node->fd, buf);
+
+        msg_broadcast(node, listen_fd, msg_recv);
       }
 
-      char new_name[16];
       if (msg_type == JOIN) {  // msg join, add to node
         parse_msg_join(*msg_recv, new_name);
         printf("newname: %s\n", new_name);

@@ -5,7 +5,6 @@
 int main(int argc, char *argv[]) {
   int sockfd, new_fd;
   int numbytes;
-  char buf[MAXDATASIZE];
   int msg_type;
   sbcp_msg_t msg_send, *msg_recv;
 

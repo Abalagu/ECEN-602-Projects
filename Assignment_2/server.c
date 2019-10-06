@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
   int status, numbytes;
   char buf[MAXDATASIZE];
   int msg_type;
-  sbcp_msg_t *msg_send, *msg_recv;
+  sbcp_msg_t msg_send, *msg_recv;
 
   if (argc != 2) {
     // check for correct usage
@@ -107,88 +107,73 @@ int main(int argc, char *argv[]) {
 
   int sin_size = sizeof(their_addr);
   char str[sin_size];
+  new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+
+  inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
+            str, sin_size);
+
+  // outside while loop
+  printf("server: got conection from %s\n", str);
+
+  // fill in test usernames
+  char usernames[10][16] = {0};
+  strcpy(usernames[0], "Akhilesh");
+  strcpy(usernames[1], "Luming");
+  strcpy(usernames[2], "P.Cantrell");
+
+  // struct exchange test: server
+  // printf("recv size: %d\n", numbytes);
+  numbytes = server_read(new_fd, buf);
+  msg_recv = (sbcp_msg_t *)buf;
+  parse_msg_join(*msg_recv);
+  printf("after parse\n");
+
+  msg_send = make_msg_ack(1, usernames);
+  printf("after make\n");
+  char reason[] = "same username";
+  // *msg_send = make_msg_nak(reason, sizeof(reason));
+  // memcpy(buf, &msg_nak, sizeof(msg_nak)); //SEND NAK TEST
+  memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
+  printf("sent ACK\n");
+
+  numbytes = server_write(new_fd, buf);
+  printf("write done.\n");
+  // add select in server on sock_fd and stdin
+  struct timeval tv;
+  fd_set readfds;
+
   while (1) {
-    while ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr,
-                            &sin_size)) == -1 &&
-           errno == EINTR) {
-      // manually restart
+    FD_ZERO(&readfds);
+    // FD_SET(STDIN, &readfds);
+    FD_SET(new_fd, &readfds);
+    tv.tv_sec = 1;
+    tv.tv_usec = 500000;
+    select(new_fd + 1, &readfds, NULL, NULL, &tv);
+
+    if (!FD_IS_ANY_SET(&readfds)) {  // timer expires
+      printf("expires.\n");
       continue;
     }
-
-    if (new_fd == -1) {
-      perror("accept");
-      continue;
-    }
-
-    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
-              str, sin_size);
-    printf("server: got conection from %s\n", str);
-
-    if (!fork()) {
-      while (numbytes = server_read(new_fd, buf)) {
-        if (numbytes == -1 && errno == EINTR) {
-          continue;
-        }
-
-        if (numbytes == -1) {
-          perror("recv");
-          exit(1);
-        }
-
-        if (numbytes == 0) {
-          printf("TCP FIN received");
-        }
-
-        // fill in test usernames
-        char usernames[10][16] = {0};
-        strcpy(usernames[0], "Akhilesh");
-        strcpy(usernames[1], "Luming");
-        strcpy(usernames[2], "P.Cantrell");
-
-        // struct exchange test: server
-        printf("recv size: %d\n", numbytes);
-
-        msg_recv = (sbcp_msg_t *)buf;
-        parse_msg_join(*msg_recv);
-        *msg_send = make_msg_ack(1, usernames);
-        char reason[] = "same username";
-        // *msg_send = make_msg_nak(reason, sizeof(reason));
-        // memcpy(buf, &msg_nak, sizeof(msg_nak)); //SEND NAK TEST
-        memcpy(buf, msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
-        printf("sent ACK\n");
-        numbytes = server_write(new_fd, buf);
-
-        while (1) {
-          numbytes = server_read(new_fd, buf);
-          msg_recv = (sbcp_msg_t *)buf;
-          msg_type = get_msg_type(*msg_recv);
-          if (msg_type == SEND) {
-            parse_msg_send(*msg_recv);
-            *msg_send = make_msg_fwd(
-                msg_recv->sbcp_attributes[0].payload,
-                sizeof(msg_recv->sbcp_attributes[0].payload), "luming", 7);
-            memcpy(buf, msg_send, sizeof(sbcp_msg_t));
-            server_write(new_fd, buf);
-          }
-        }
-        // echo back
-        while ((numbytes = server_write(new_fd, buf) == -1 && errno == EINTR)) {
-          continue;
-        }
-
-        if (numbytes == -1) {
-          perror("send");
-          exit(1);
-        }
-
-        // printf("send: %s\n", buf);
+    if (FD_ISSET(new_fd, &readfds)) {  // a client sends msg
+      printf("select on new_fd\n");
+      numbytes = server_read(new_fd, buf);
+      if (numbytes == 0) {
+        printf("FIN received.\n");
+        return 0; // temporary handle of disconnection
       }
-      // client disconnected
-      printf("TCP FIN received");
-      fflush(stdout);
-      // let it go
-      close(new_fd);
-    }
+
+      msg_recv = (sbcp_msg_t *)buf;
+      msg_type = get_msg_type(*msg_recv);
+      if (msg_type == SEND) {
+        parse_msg_send(*msg_recv);
+        msg_send = make_msg_fwd(msg_recv->sbcp_attributes[0].payload,
+                                sizeof(msg_recv->sbcp_attributes[0].payload),
+                                "luming", 7);
+        memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
+        server_write(new_fd, buf);
+      }
+    }  // if new_fd is set
   }
+
   return 0;
 }

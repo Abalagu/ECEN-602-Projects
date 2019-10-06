@@ -56,7 +56,6 @@ sbcp_msg_t make_msg_offline(char *username, size_t name_len) {
 // count should be inclusive of the requestor
 sbcp_msg_t make_msg_ack(int count, char usernames[10][16]) {
   sbcp_msg_t msg_ack = {0};
-
   msg_ack.vrsn_type_len = (VRSN << 23 | ACK << 16 | sizeof(sbcp_msg_t));
 
   // fill in client count
@@ -69,7 +68,9 @@ sbcp_msg_t make_msg_ack(int count, char usernames[10][16]) {
   // fill in client names
   msg_ack.sbcp_attributes[1].sbcp_attribute_type = USERNAME;
   msg_ack.sbcp_attributes[1].len = sizeof(160);
+
   str_join(msg_ack.sbcp_attributes[1].payload, usernames);
+
   return msg_ack;
 }
 

@@ -4,7 +4,6 @@
 #include "common_lib.h"
 #include "config.h"
 
-
 void print_usernames(char *buf);
 
 sbcp_msg_t make_msg_join(char *username, size_t payload_len);
@@ -16,7 +15,7 @@ sbcp_msg_t make_msg_idle_c(char *username, size_t name_len);
 
 void parse_msg_nak(sbcp_msg_t msg_nak);
 void parse_msg_ack(sbcp_msg_t msg_ack);
-
+void parse_msg_fwd(sbcp_msg_t msg_fwd);
 // int writen(int sockfd, char *buf);
 int writen(int sockfd, char *buf, size_t size_buf);
 

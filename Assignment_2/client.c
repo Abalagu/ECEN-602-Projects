@@ -43,12 +43,19 @@ int main(int argc, char *argv[]) {
   // start rx tx message with server
 
   while (1) {
-    printf("send:\n");
+    printf("send: ");
     fgets(send_buf, MAX_MSG_LEN - 1, stdin);
-    msg_send = make_msg_send(send_buf, strlen(send_buf)+1);
+    // from SO, remove \n from stdin read
+    send_buf[strcspn(send_buf, "\n")]=0; 
+    msg_send = make_msg_send(send_buf, strlen(send_buf) + 1);
     memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
     writen(sock_fd, buf, sizeof(sbcp_msg_t));
-
+    readline(sock_fd, recv_buf);
+    msg = (sbcp_msg_t *)recv_buf;
+    msg_type = get_msg_type(*msg);
+    if (msg_type == FWD) {
+      parse_msg_fwd(*msg);
+    }
   }
   return 0;
 }

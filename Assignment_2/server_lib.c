@@ -70,7 +70,6 @@ sbcp_msg_t make_msg_ack(int count, char usernames[10][16]) {
   msg_ack.sbcp_attributes[1].sbcp_attribute_type = USERNAME;
   msg_ack.sbcp_attributes[1].len = sizeof(160);
   str_join(msg_ack.sbcp_attributes[1].payload, usernames);
-
   return msg_ack;
 }
 
@@ -98,10 +97,14 @@ sbcp_msg_t make_msg_idle_s(char *username, size_t name_len) {
 }
 
 void parse_msg_join(sbcp_msg_t msg_join) {
-  printf("sizeof msg: %ld\n", sizeof(msg_join));
-  parse_vtl(msg_join.vrsn_type_len);
-  parse_sbcp_attribute(msg_join.sbcp_attributes[0]);
-  parse_sbcp_attribute(msg_join.sbcp_attributes[1]);
+  if (msg_join.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
+    printf("%s want to join the chat.\n", msg_join.sbcp_attributes[0].payload);
+  }
+
+  // printf("sizeof msg: %ld\n", sizeof(msg_join));
+  // parse_vtl(msg_join.vrsn_type_len);
+  // parse_sbcp_attribute(msg_join.sbcp_attributes[0]);
+  // parse_sbcp_attribute(msg_join.sbcp_attributes[1]);
 }
 
 void parse_msg_idle(sbcp_msg_t msg_idle) {}

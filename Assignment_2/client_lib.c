@@ -48,6 +48,17 @@ sbcp_msg_t make_msg_idle_c(char *username, size_t name_len) {
   return msg_idle;
 }
 
+void parse_msg_fwd(sbcp_msg_t msg_fwd) {
+  if (msg_fwd.sbcp_attributes[0].sbcp_attribute_type == MESSAGE &&
+      msg_fwd.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
+    // username: message
+    printf("%s: %s\n", msg_fwd.sbcp_attributes[1].payload,
+           msg_fwd.sbcp_attributes[0].payload);
+  } else {
+    printf("!WRONG ATTRIBUTE TYPE FOR MSG FWD.\n");
+  }
+}
+
 void parse_msg_nak(sbcp_msg_t msg_nak) {
   if (msg_nak.sbcp_attributes[0].sbcp_attribute_type == REASON) {
     printf("NAK REASON: %s\n", msg_nak.sbcp_attributes[0].payload);
@@ -71,7 +82,8 @@ void parse_msg_ack(sbcp_msg_t msg_ack) {
   if (msg_ack.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
     print_usernames(msg_ack.sbcp_attributes[1].payload);
   } else {
-    printf("ATTRIBUTE ERROR. EXPECT USERNAME.\n");
+    printf("ATTRIBUTE ERROR: %d. EXPECT USERNAME.\n",
+           msg_ack.sbcp_attributes[1].sbcp_attribute_type);
     return;
   }
 }

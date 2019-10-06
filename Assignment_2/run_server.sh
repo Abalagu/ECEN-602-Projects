@@ -1,4 +1,4 @@
 rm server
 clear
 make server
-./server 12345
+./server localhost 12345 10

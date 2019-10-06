@@ -10,17 +10,16 @@ int main(int argc, char *argv[]) {
   int msg_type;
   sbcp_msg_t msg_send, *msg_recv;
 
-  if (argc != 2) {
+  if (argc != 4) {
     // check for correct usage
-    fprintf(stderr, "usage: echos Port\n");
+    fprintf(stderr, "usage: ./server server_ip server_port max_clients\n");
     exit(1);
   }
-  sockfd = server_init(argv[1]);
-  new_fd = connect_client(sockfd);
+  char *server_ip = argv[1], *server_port = argv[2];
+  int max_clients = atoi(argv[3]);
 
-  // while (1) {
-  //   new_fd = connect_client(sockfd);
-  // }
+  sockfd = server_init(server_port);
+  new_fd = connect_client(sockfd);
 
   // fill in test usernames
   char usernames[10][16] = {0};

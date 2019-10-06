@@ -8,13 +8,18 @@ int main(int argc, char *argv[]) {
   sbcp_msg_t msg_send;
   int numbytes;
 
+  if (argc != 4) {
+    printf("usage: ./client username server_ip server_port\n");
+    return 0;
+  }
+
   printf("\n");
-  char username[] = "luming";
+  char *username = argv[1];
   char message[] = "hello world!";
 
   // make simple connection to server
   int sock_fd;
-  char *host = "localhost", *server_port = "12345";
+  char *host = argv[2], *server_port = argv[3];
   sock_fd = server_lookup_connect(host, server_port);
   if (sock_fd < 0) {
     printf("connection error.\n");

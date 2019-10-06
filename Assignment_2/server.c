@@ -122,14 +122,11 @@ int main(int argc, char *argv[]) {
   strcpy(usernames[2], "P.Cantrell");
 
   // struct exchange test: server
-  // printf("recv size: %d\n", numbytes);
   numbytes = server_read(new_fd, buf);
   msg_recv = (sbcp_msg_t *)buf;
   parse_msg_join(*msg_recv);
-  printf("after parse\n");
 
   msg_send = make_msg_ack(1, usernames);
-  printf("after make\n");
   char reason[] = "same username";
   // *msg_send = make_msg_nak(reason, sizeof(reason));
   // memcpy(buf, &msg_nak, sizeof(msg_nak)); //SEND NAK TEST
@@ -137,7 +134,6 @@ int main(int argc, char *argv[]) {
   printf("sent ACK\n");
 
   numbytes = server_write(new_fd, buf);
-  printf("write done.\n");
   // add select in server on sock_fd and stdin
   struct timeval tv;
   fd_set readfds;
@@ -159,7 +155,7 @@ int main(int argc, char *argv[]) {
       numbytes = server_read(new_fd, buf);
       if (numbytes == 0) {
         printf("FIN received.\n");
-        return 0; // temporary handle of disconnection
+        return 0;  // temporary handle of disconnection
       }
 
       msg_recv = (sbcp_msg_t *)buf;

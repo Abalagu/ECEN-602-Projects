@@ -4,6 +4,8 @@ int main(int argc, char *argv[]) {
   // struct exchange test: client
   char buf[MAXDATASIZE];
   char recv_buf[MAXDATASIZE];
+  char send_buf[MAX_MSG_LEN];
+  sbcp_msg_t msg_send;
 
   printf("\n");
   char username[] = "luming";
@@ -32,15 +34,21 @@ int main(int argc, char *argv[]) {
     parse_msg_ack(*msg);
   } else if (msg_type == NAK) {
     printf("NAK received.\n");
-    parse_msg_nak(*msg); 
-		return 0; //retry with different username
+    parse_msg_nak(*msg);
+    return 0;  // retry with different username
   } else {
     printf("message type error\n");
-		return 0; //routine error
+    return 0;  // routine error
   }
-	// start rx tx message with server
+  // start rx tx message with server
 
   while (1) {
+    printf("send:\n");
+    fgets(send_buf, MAX_MSG_LEN - 1, stdin);
+    msg_send = make_msg_send(send_buf, strlen(send_buf)+1);
+    memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
+    writen(sock_fd, buf, sizeof(sbcp_msg_t));
+
   }
   return 0;
 }

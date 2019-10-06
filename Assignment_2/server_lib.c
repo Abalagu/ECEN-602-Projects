@@ -106,4 +106,6 @@ void parse_msg_join(sbcp_msg_t msg_join) {
 
 void parse_msg_idle(sbcp_msg_t msg_idle) {}
 
-void parse_msg_send(sbcp_msg_t msg_send) {}
+void parse_msg_send(sbcp_msg_t msg_send) {
+  printf("msg: %s\n", msg_send.sbcp_attributes[0].payload);
+}

@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
   struct sigaction sa;
   int status, numbytes;
   char buf[MAXDATASIZE];
-
+  int msg_type;
   if (argc != 2) {
     // check for correct usage
     fprintf(stderr, "usage: echos Port\n");
@@ -152,8 +152,18 @@ int main(int argc, char *argv[]) {
         char reason[] = "same username";
         sbcp_msg_t msg_nak = make_msg_nak(reason, sizeof(reason));
         // memcpy(buf, &msg_nak, sizeof(msg_nak)); //SEND NAK TEST
-        memcpy(buf, &msg_ack, sizeof(msg_ack)); //SEND ACK TEST
+        memcpy(buf, &msg_ack, sizeof(msg_ack));  // SEND ACK TEST
         printf("sent ACK\n");
+        numbytes = server_write(new_fd, buf);
+
+        while (1) {
+          numbytes = server_read(new_fd, buf);
+          sbcp_msg_t *msg = (sbcp_msg_t *)buf;
+          msg_type = get_msg_type(*msg);
+          if (msg_type == SEND) {
+            parse_msg_send(*msg);
+          }
+        }
         // echo back
         while ((numbytes = server_write(new_fd, buf) == -1 && errno == EINTR)) {
           continue;

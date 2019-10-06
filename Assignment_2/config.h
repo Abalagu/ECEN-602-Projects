@@ -5,7 +5,7 @@
 
 #define VRSN 3
 #define MAXDATASIZE 1500
-
+#define MAX_MSG_LEN 512
 typedef enum
 {
     JOIN = 2,    //CLIENT TO SERVER, USERNAME

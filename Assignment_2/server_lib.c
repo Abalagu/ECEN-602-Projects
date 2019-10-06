@@ -1,5 +1,10 @@
 #include "server_lib.h"
 
+typedef struct {
+  int data;
+  client_t *next;
+} client_t;
+
 // join 2-d username array to 1-d array of size 512
 char *str_join(char *buf, char string_array[10][16]) {
   // assume buffer has 512 size

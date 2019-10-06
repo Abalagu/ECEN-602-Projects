@@ -2,7 +2,6 @@
 
 #define MAXDATASIZE 1500
 
-
 int main(int argc, char *argv[]) {
   int sockfd, new_fd;
   socklen_t addr_size;
@@ -18,6 +17,10 @@ int main(int argc, char *argv[]) {
   }
   sockfd = server_init(argv[1]);
   new_fd = connect_client(sockfd);
+
+  // while (1) {
+  //   new_fd = connect_client(sockfd);
+  // }
 
   // fill in test usernames
   char usernames[10][16] = {0};
@@ -46,14 +49,25 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&readfds);
     // FD_SET(STDIN, &readfds);
     FD_SET(new_fd, &readfds);
+    FD_SET(sockfd, &readfds);
+
     tv.tv_sec = 1;
     tv.tv_usec = 500000;
-    select(new_fd + 1, &readfds, NULL, NULL, &tv);
+    if (new_fd > sockfd) {
+      select(new_fd + 1, &readfds, NULL, NULL, &tv);
+    } else {
+      select(sockfd + 1, &readfds, NULL, NULL, &tv);
+    }
 
     if (!FD_IS_ANY_SET(&readfds)) {  // timer expires
       printf("expires.\n");
       continue;
     }
+    if (FD_ISSET(sockfd, &readfds)) {
+      new_fd = connect_client(sockfd);
+      printf("new client connects.");
+    }
+
     if (FD_ISSET(new_fd, &readfds)) {  // a client sends msg
       printf("select on new_fd\n");
       numbytes = server_read(new_fd, buf);

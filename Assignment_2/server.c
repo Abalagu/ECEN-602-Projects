@@ -1,17 +1,12 @@
 #include "server.h"
 
-#define BACKLOG 10
 #define MAXDATASIZE 1500
 
 
 int main(int argc, char *argv[]) {
   int sockfd, new_fd;
-  struct addrinfo hints, *res, *p;
-  struct sockaddr_storage their_addr;  // connector's address information
   socklen_t addr_size;
-  int yes = 1;
-  struct sigaction sa;
-  int status, numbytes;
+  int numbytes;
   char buf[MAXDATASIZE];
   int msg_type;
   sbcp_msg_t msg_send, *msg_recv;
@@ -21,73 +16,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "usage: echos Port\n");
     exit(1);
   }
-
-  memset(&hints, 0, sizeof(hints));
-
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;  // fill in my IP
-
-  if ((status = getaddrinfo(NULL, argv[1], &hints, &res)) != 0) {
-    fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-    return 1;
-  }
-
-  // loop through all the results and bind to the first correct
-  for (p = res; p != NULL; p = p->ai_next) {
-    if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-      perror("server: socket");
-      continue;
-    }
-
-    // allow other sockets to bind to this port
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
-      perror("setsocketopt");
-      exit(1);
-    }
-
-    if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-      close(sockfd);
-      perror("server: bind");
-      continue;
-    }
-
-    break;
-  }
-
-  // we don't need it now
-  freeaddrinfo(res);
-
-  if (p == NULL) {
-    fprintf(stderr, "server: failed to bind\n");
-    exit(1);
-  }
-
-  if (listen(sockfd, BACKLOG) == -1) {
-    perror("listen");
-    exit(1);
-  }
-
-  // reap all dead process - function taken from beej's guide
-  sa.sa_handler = sigchild_handler;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = SA_RESTART;
-  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(1);
-  }
-
-  printf("server: waiting for connections....\n");
-
-  int sin_size = sizeof(their_addr);
-  char str[sin_size];
-  new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-
-  inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
-            str, sin_size);
-
-  // outside while loop
-  printf("server: got conection from %s\n", str);
+  sockfd = server_init(argv[1]);
+  new_fd = connect_client(sockfd);
 
   // fill in test usernames
   char usernames[10][16] = {0};

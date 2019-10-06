@@ -3,6 +3,7 @@
 
 #include "common_lib.h"
 #include "config.h"
+#define BACKLOG 10
 
 #endif
 
@@ -29,3 +30,7 @@ void sigchild_handler(int s);
 void *get_in_addr(struct sockaddr *sa);
 int server_read(int new_fd, char *buf);
 int server_write(int new_fd, char *buf);
+
+// refactored server init bind and receive connection
+int server_init(char *port);
+int connect_client(int sockfd);

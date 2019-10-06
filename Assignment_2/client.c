@@ -6,6 +6,7 @@ int main(int argc, char *argv[]) {
   char recv_buf[MAXDATASIZE];
   char send_buf[MAX_MSG_LEN];
   sbcp_msg_t msg_send;
+  int numbytes;
 
   printf("\n");
   char username[] = "luming";
@@ -68,7 +69,11 @@ int main(int argc, char *argv[]) {
     }
     if (FD_ISSET(sock_fd, &readfds)) {
       printf("select socket.\n");
-      readline(sock_fd, recv_buf);
+      numbytes = readline(sock_fd, recv_buf);
+      if (numbytes == 0) {
+        printf("server disconnect.\n");
+        return 0;
+      }
       msg = (sbcp_msg_t *)recv_buf;
       msg_type = get_msg_type(*msg);
       if (msg_type == FWD) {

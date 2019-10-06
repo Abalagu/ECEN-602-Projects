@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     fd_select(&readfds, *listen_fd);
 
     if (!FD_IS_ANY_SET(&readfds)) {  // timer expires
-      printf("expires.\n");
+      // printf("expires.\n");
       print_nodes(listen_fd);
       continue;
     }

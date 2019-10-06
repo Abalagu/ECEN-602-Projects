@@ -8,7 +8,7 @@ void fd_select(fd_set *readfds, socket_fd_t listen_fd) {
   FD_ZERO(readfds);
   FD_SET(listen_fd.fd, readfds);
 
-  tv.tv_sec = 2;
+  tv.tv_sec = 5;
   tv.tv_usec = 500000;
   socket_fd_t *node = &listen_fd;
 
@@ -52,6 +52,7 @@ void append_node(socket_fd_t **head_ref, int new_fd, char *new_username) {
 
 // This function prints contents of linked list starting from head
 void print_nodes(socket_fd_t *node) {
+  printf("monitored nodes: \n");
   while (node != NULL) {
     printf(" %d: %s\n", node->fd, node->username);
     node = node->next;
@@ -240,14 +241,12 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
 
   if (FD_ISSET(listen_fd->fd, &readfds)) {  // incoming new connection
     new_fd = connect_client(listen_fd->fd);
-    printf("new client connects.");
     append_node(&listen_fd, new_fd, "");
   }
 
   socket_fd_t *node = listen_fd->next;
   while (node != NULL) {
     if (FD_ISSET(node->fd, &readfds)) {  // a client sends msg
-      printf("select on a node\n");
       numbytes = server_read(node->fd, buf);
       if (numbytes == 0) {
         printf("FIN received.\n");
@@ -266,7 +265,6 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
 
       if (msg_type == JOIN) {  // msg join, add to node
         parse_msg_join(*msg_recv, new_name);
-        printf("newname: %s\n", new_name);
         memcpy(node->username, new_name, 16);
 
         get_usernames(usernames, listen_fd);

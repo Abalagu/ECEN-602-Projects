@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
   }
 
   printf("\n");
-  char *username = argv[1];
+  char *my_name = argv[1];
   char message[] = "hello world!";
 
   // make simple connection to server
@@ -25,21 +25,21 @@ int main(int argc, char *argv[]) {
     printf("connection error.\n");
     return 1;
   }
-  printf("connected\n");
+  printf("Connected to server. Joining...\n");
 
   int msg_type;
   // SEND JOIN TO SERVER
-  sbcp_msg_t msg_join = make_msg_join(username, sizeof(username));
+  sbcp_msg_t msg_join = make_msg_join(my_name, sizeof(my_name));
   memcpy(buf, &msg_join, sizeof(msg_join));
   writen(sock_fd, buf, sizeof(msg_join));
   readline(sock_fd, recv_buf);
   sbcp_msg_t *msg = (sbcp_msg_t *)recv_buf;
   msg_type = get_msg_type(*msg);
   if (msg_type == ACK) {
-    printf("join success\n");
-    parse_msg_ack(*msg);
+    if (parse_msg_ack(*msg, my_name) != 0) {
+      return 0;  // message parse error.
+    };
   } else if (msg_type == NAK) {
-    printf("NAK received.\n");
     parse_msg_nak(*msg);
     return 0;  // retry with different username
   } else {
@@ -64,7 +64,6 @@ int main(int argc, char *argv[]) {
       continue;
     }
     if (FD_ISSET(STDIN, &readfds)) {
-      printf("select stdin.\n");
       fgets(send_buf, MAX_MSG_LEN - 1, stdin);
       // from SO, use strcspn to remove \n from stdin read
       send_buf[strcspn(send_buf, "\n")] = 0;
@@ -72,9 +71,8 @@ int main(int argc, char *argv[]) {
       memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
       writen(sock_fd, buf, sizeof(sbcp_msg_t));
     }
-    
+
     if (FD_ISSET(sock_fd, &readfds)) {
-      printf("select socket.\n");
       numbytes = readline(sock_fd, recv_buf);
       if (numbytes == 0) {
         printf("server disconnect.\n");
@@ -86,8 +84,6 @@ int main(int argc, char *argv[]) {
         parse_msg_fwd(*msg);
       }
     }
-
-    printf("send: ");
   }
   return 0;
 }

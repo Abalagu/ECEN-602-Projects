@@ -61,7 +61,7 @@ void parse_msg_fwd(sbcp_msg_t msg_fwd) {
 
 void parse_msg_nak(sbcp_msg_t msg_nak) {
   if (msg_nak.sbcp_attributes[0].sbcp_attribute_type == REASON) {
-    printf("NAK REASON: %s\n", msg_nak.sbcp_attributes[0].payload);
+    printf("Join rejected! NAK REASON: %s\n", msg_nak.sbcp_attributes[0].payload);
   } else {
     printf("ATTRIBUTE ERROR. EXPECT REASON.\n");
   }
@@ -71,20 +71,15 @@ void parse_msg_offline(sbcp_msg_t msg_offline) {
   printf("user %s is offline.\n", msg_offline.sbcp_attributes[0].payload);
 }
 
-void parse_msg_ack(sbcp_msg_t msg_ack) {
-  if (msg_ack.sbcp_attributes[0].sbcp_attribute_type == CLIENTCOUNT) {
-    printf("client count(excluding self): %s\n",
+int parse_msg_ack(sbcp_msg_t msg_ack, char *my_name) {
+  if (msg_ack.sbcp_attributes[0].sbcp_attribute_type == CLIENTCOUNT &&
+      msg_ack.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
+    printf("Join success! Your username: %s\n", my_name);
+    printf("#clients in chat(excluding yourself): %s\n",
            msg_ack.sbcp_attributes[0].payload);
-  } else {
-    printf("ATTRIBUTE ERROR. EXPECT COUNT.\n");
-    return;
-  }
-  if (msg_ack.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
-    print_usernames(msg_ack.sbcp_attributes[1].payload);
-  } else {
-    printf("ATTRIBUTE ERROR: %d. EXPECT USERNAME.\n",
-           msg_ack.sbcp_attributes[1].sbcp_attribute_type);
-    return;
+    return 0;
+  } else {  // attribute error
+    return 1;
   }
 }
 

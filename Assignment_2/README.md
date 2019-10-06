@@ -8,5 +8,7 @@
 Exchange JOIN message
 
 ## Execution:
-1. run ./run_server.sh
-2. run ./run_client.sh
+1. launch server: run ./run_server.sh
+2. launch first client: run ./run_client.sh
+3. launch second client: run ./run_2client.sh
+

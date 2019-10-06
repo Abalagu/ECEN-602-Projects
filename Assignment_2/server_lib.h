@@ -23,3 +23,9 @@ char *str_join(char *buf, char string_array[10][16]);
 
 void parse_msg_join(sbcp_msg_t msg_join);
 void parse_msg_send(sbcp_msg_t msg_send);
+
+// connection rxtx related
+void sigchild_handler(int s);
+void *get_in_addr(struct sockaddr *sa);
+int server_read(int new_fd, char *buf);
+int server_write(int new_fd, char *buf);

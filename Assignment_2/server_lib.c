@@ -113,3 +113,30 @@ void parse_msg_idle(sbcp_msg_t msg_idle) {}
 void parse_msg_send(sbcp_msg_t msg_send) {
   printf("msg: %s\n", msg_send.sbcp_attributes[0].payload);
 }
+
+// function taken from beej's guide
+void sigchild_handler(int s) {
+  int saved_errno = errno;
+
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    ;
+
+  errno = saved_errno;
+}
+
+void *get_in_addr(struct sockaddr *sa) {
+  if (sa->sa_family == AF_INET) {
+    return &(((struct sockaddr_in *)sa)->sin_addr);
+  }
+  return &(((struct sockaddr_in6 *)sa)->sin6_addr);
+}
+
+int server_read(int new_fd, char *buf) {
+  // read the received buffer from the socket
+  return recv(new_fd, buf, MAXDATASIZE - 1, 0);
+}
+
+int server_write(int new_fd, char *buf) {
+  // send the buffer to the socket
+  return send(new_fd, buf, MAXDATASIZE - 1, 0);
+}

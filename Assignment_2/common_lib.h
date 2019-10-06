@@ -3,6 +3,9 @@
 
 #include "config.h"
 #include "headers.h"
+#define STDIN 0  // file descriptor for stdin
+
+bool FD_IS_ANY_SET(fd_set const *fdset);
 
 void print_hex(char *array);
 
@@ -13,6 +16,5 @@ int get_msg_type(sbcp_msg_t msg);
 void parse_vtl(uint32_t vtl);
 
 void parse_sbcp_attribute(sbcp_attribute_t sbcp_attribute);
-
 
 #endif

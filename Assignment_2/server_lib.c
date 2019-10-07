@@ -52,9 +52,9 @@ void append_node(socket_fd_t **head_ref, int new_fd, char *new_username) {
 
 // This function prints contents of linked list starting from head
 void print_nodes(socket_fd_t *node) {
-  printf("monitored nodes: \n");
+  printf("  Monitored Nodes: \n");
   while (node != NULL) {
-    printf(" %d: %s\n", node->fd, node->username);
+    printf("    %d: %s\n", node->fd, node->username);
     node = node->next;
   }
 }
@@ -275,13 +275,14 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
       if (msg_type == JOIN) {  // msg join, add to node
         parse_msg_join(*msg_recv, new_name);
         if (is_duplicate_name(listen_fd, new_name) == 0) {
+          printf("%s ACCEPTED.\n", new_name);
           memcpy(node->username, new_name, 16);
           get_usernames(usernames, listen_fd);
           msg_send = make_msg_ack(1, usernames);
           memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
           numbytes = server_write(node->fd, buf);
         } else {  // is duplicate, send NAK, close fd, then remove this node
-          printf("REJECTED!\n");
+          printf("%s REJECTED!\n", new_name);
           msg_send = make_msg_nak(reason, sizeof(reason));
           memcpy(buf, &msg_send, sizeof(msg_send));  // SEND NAK TEST
           close(node->fd);
@@ -399,6 +400,6 @@ int connect_client(int sockfd) {
             str, sin_size);
 
   // outside while loop
-  printf("server: got conection from %s\n", str);
+  // printf("server: got conection from %s\n", str);
   return new_fd;
 }

@@ -1,5 +1,18 @@
 #include "client_lib.h"
 
+// add pasted time to timer
+int update_idle_time(int idle_cumulation, struct timeval tv, int is_idle) {
+  if (!is_idle) {
+    int elapsed_time =
+        (SELECT_TIMEOUT * 1000000 - (tv.tv_usec + 1000000 * tv.tv_sec));
+
+    // tolerance deduct elapsed time
+    idle_cumulation += elapsed_time;
+    printf("sec: %ld, usec: %ld, cumu: %d, elapsed: %d\n", tv.tv_sec,
+           tv.tv_usec, idle_cumulation, elapsed_time);
+  }
+  return idle_cumulation;
+}
 // print multiple username from 1-d buffer
 void print_usernames(char *buf) {
   // each username has 16 bytes space

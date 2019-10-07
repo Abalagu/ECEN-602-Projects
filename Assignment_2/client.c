@@ -50,21 +50,29 @@ int main(int argc, char *argv[]) {
   // add select in client read from stdin or socket fd
   struct timeval tv;
   fd_set readfds;
-
+  int idle_cumulation = 0;
+  int is_idle = 0;
   // start rx tx message with server
   while (1) {
+    // more than 10 seconds no action, send idle message
+    if (!is_idle && idle_cumulation >= IDLE_TIMEOUT * 1000000) {
+      printf("idle for more than %ds.\n", IDLE_TIMEOUT);
+      is_idle = 1;
+    }
+
     FD_ZERO(&readfds);
     FD_SET(STDIN, &readfds);
     FD_SET(sock_fd, &readfds);
-    tv.tv_sec = 1;  // total of 1.5s waiting time
-    tv.tv_usec = 500000;
+    tv.tv_sec = SELECT_TIMEOUT;  // total of 10s waiting time
+    tv.tv_usec = 0;
     select(sock_fd + 1, &readfds, NULL, NULL, &tv);
+    idle_cumulation = update_idle_time(idle_cumulation, tv, is_idle);
 
     if (!FD_IS_ANY_SET(&readfds)) {
-      // printf("time expires\n");
       continue;
     }
     if (FD_ISSET(STDIN, &readfds)) {
+      idle_cumulation = 1000000;  // reinit idle tolerance
       fgets(send_buf, MAX_MSG_LEN - 1, stdin);
       // from SO, use strcspn to remove \n from stdin read
       send_buf[strcspn(send_buf, "\n")] = 0;
@@ -85,7 +93,7 @@ int main(int argc, char *argv[]) {
         parse_msg_fwd(*msg);
       } else if (msg_type == OFFLINE) {
         parse_msg_offline(*msg);
-      } else if(msg_type == ONLINE){
+      } else if (msg_type == ONLINE) {
         parse_msg_online(*msg);
       }
     }

@@ -1,5 +1,17 @@
 #include "client_lib.h"
 
+// add pasted time to timer
+int update_idle_time(int idle_cumulation, struct timeval tv, int is_idle) {
+  if (!is_idle) {
+    int elapsed_time =
+        (SELECT_TIMEOUT * 1000000 - (tv.tv_usec + 1000000 * tv.tv_sec));
+
+    // tolerance deduct elapsed time
+    idle_cumulation += elapsed_time;
+    // printf("total idle time: %d\n", idle_cumulation);
+  }
+  return idle_cumulation;
+}
 // print multiple username from 1-d buffer
 void print_usernames(char *buf) {
   // each username has 16 bytes space
@@ -48,36 +60,52 @@ sbcp_msg_t make_msg_idle_c(char *username, size_t name_len) {
   return msg_idle;
 }
 
+void parse_msg_fwd(sbcp_msg_t msg_fwd) {
+  if (msg_fwd.sbcp_attributes[0].sbcp_attribute_type == MESSAGE &&
+      msg_fwd.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
+    // username: message
+    printf("%s: %s\n", msg_fwd.sbcp_attributes[1].payload,
+           msg_fwd.sbcp_attributes[0].payload);
+  } else {
+    printf("!WRONG ATTRIBUTE TYPE FOR MSG FWD.\n");
+  }
+}
+
 void parse_msg_nak(sbcp_msg_t msg_nak) {
   if (msg_nak.sbcp_attributes[0].sbcp_attribute_type == REASON) {
-    printf("NAK REASON: %s\n", msg_nak.sbcp_attributes[0].payload);
+    printf("Join rejected! NAK REASON: %s\n",
+           msg_nak.sbcp_attributes[0].payload);
   } else {
     printf("ATTRIBUTE ERROR. EXPECT REASON.\n");
   }
 }
 
-void parse_msg_offline(sbcp_msg_t msg_offline) {
-  printf("user %s is offline.\n", msg_offline.sbcp_attributes[0].payload);
-}
-
-void parse_msg_ack(sbcp_msg_t msg_ack) {
-  if (msg_ack.sbcp_attributes[0].sbcp_attribute_type == CLIENTCOUNT) {
-    printf("client count(excluding self): %s\n",
+int parse_msg_ack(sbcp_msg_t msg_ack, char *my_name) {
+  if (msg_ack.sbcp_attributes[0].sbcp_attribute_type == CLIENTCOUNT &&
+      msg_ack.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
+    printf("Join success! Your username: %s\n", my_name);
+    printf("#clients in chat(excluding yourself): %s\n",
            msg_ack.sbcp_attributes[0].payload);
-  } else {
-    printf("ATTRIBUTE ERROR. EXPECT COUNT.\n");
-    return;
-  }
-  if (msg_ack.sbcp_attributes[1].sbcp_attribute_type == USERNAME) {
-    print_usernames(msg_ack.sbcp_attributes[1].payload);
-  } else {
-    printf("ATTRIBUTE ERROR. EXPECT USERNAME.\n");
-    return;
+    return 0;
+  } else {  // attribute error
+    return 1;
   }
 }
 
 void parse_msg_online(sbcp_msg_t msg_online) {
-  printf("user %s is back online.\n", msg_online.sbcp_attributes[0].payload);
+  if (msg_online.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
+    printf("%s has joined the chat.\n", msg_online.sbcp_attributes[0].payload);
+  } else {
+    printf("MSG ONLINE ATTR ERROR.\n");
+  }
+}
+
+void parse_msg_offline(sbcp_msg_t msg_offline) {
+  if (msg_offline.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
+    printf("%s has left the chat.\n", msg_offline.sbcp_attributes[0].payload);
+  } else {
+    printf("MSG OFFLINE ATTR ERROR.\n");
+  }
 }
 
 void parse_msg_idle(sbcp_msg_t msg_idle) {

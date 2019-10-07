@@ -1,5 +1,11 @@
 #include "common_lib.h"
 
+// from SO, check if any fd is set
+bool FD_IS_ANY_SET(fd_set const *fdset) {
+  static fd_set empty;
+  return memcmp(fdset, &empty, sizeof(fd_set)) != 0;
+}
+
 void print_hex(char *array) {
   for (int i = 0; i < sizeof array; i++) {
     printf(" %2x", array[i]);

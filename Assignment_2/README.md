@@ -67,6 +67,7 @@
 ### Case 4
 
 #### server rejects the client because it exceeds the maximum number 
+#### server rejects the client because it exceeds the maximum number 
 
 ![test case 4](./test_cases/t4_exceeds_max.jpg)
 

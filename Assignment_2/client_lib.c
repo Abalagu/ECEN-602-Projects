@@ -8,7 +8,7 @@ int update_idle_time(int idle_cumulation, struct timeval tv, int is_idle) {
 
     // tolerance deduct elapsed time
     idle_cumulation += elapsed_time;
-    printf("total idle time: %d\n", idle_cumulation);
+    // printf("total idle time: %d\n", idle_cumulation);
   }
   return idle_cumulation;
 }

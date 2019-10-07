@@ -8,7 +8,7 @@ void fd_select(fd_set *readfds, socket_fd_t listen_fd) {
   FD_ZERO(readfds);
   FD_SET(listen_fd.fd, readfds);
 
-  tv.tv_sec = 5;
+  tv.tv_sec = 25;
   tv.tv_usec = 500000;
   socket_fd_t *node = &listen_fd;
 
@@ -310,6 +310,7 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
           printf("%s REJECTED!\n", new_name);
           msg_send = make_msg_nak(reason, sizeof(reason));
           memcpy(buf, &msg_send, sizeof(msg_send));
+          numbytes = server_write(node->fd, buf);
           close(node->fd);
           remove_node(listen_fd, *node);
         };

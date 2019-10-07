@@ -236,6 +236,16 @@ int is_duplicate_name(socket_fd_t *listen_fd, char *new_name) {
   return 0;
 }
 
+// return number of clients in the chat
+int client_count(socket_fd_t *listen_fd) {
+  int count = 0;
+  socket_fd_t *node = listen_fd->next;
+  while (node != NULL) {
+    count += 1;
+    node = node->next;
+  }
+  return count;
+}
 // traverse through all nodes, recv possible msg
 void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char buf[MAXDATASIZE];
@@ -278,7 +288,7 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
           printf("%s ACCEPTED.\n", new_name);
           memcpy(node->username, new_name, 16);
           get_usernames(usernames, listen_fd);
-          msg_send = make_msg_ack(1, usernames);
+          msg_send = make_msg_ack(client_count(listen_fd) - 1, usernames);
           memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
           numbytes = server_write(node->fd, buf);
         } else {  // is duplicate, send NAK, close fd, then remove this node
@@ -287,7 +297,6 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
           memcpy(buf, &msg_send, sizeof(msg_send));  // SEND NAK TEST
           close(node->fd);
           remove_node(listen_fd, *node);
-        
         };
       }
     }  // if fd in node is set

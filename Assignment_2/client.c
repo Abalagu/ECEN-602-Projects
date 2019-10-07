@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     tv.tv_usec = 0;
     select(sock_fd + 1, &readfds, NULL, NULL, &tv);
     idle_cumulation = update_idle_time(idle_cumulation, tv, is_idle);
-    printf("after update\n");
+    
     if (!FD_IS_ANY_SET(&readfds)) {
       continue;
     }

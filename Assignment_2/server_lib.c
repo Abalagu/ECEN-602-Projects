@@ -168,7 +168,6 @@ void parse_msg_join(sbcp_msg_t msg_join, char *new_name) {
 void parse_msg_idle(sbcp_msg_t msg_idle) {}
 
 void parse_msg_send(sbcp_msg_t msg_send, char *client_message) {
-  memset(client_message, 0, 512);
   memcpy(client_message, msg_send.sbcp_attributes[0].payload, 512);
   // printf("msg: %s\n", );
 }

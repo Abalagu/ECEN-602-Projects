@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     tv.tv_usec = 0;
     select(sock_fd + 1, &readfds, NULL, NULL, &tv);
     idle_cumulation = update_idle_time(idle_cumulation, tv, is_idle);
-    
+
     if (!FD_IS_ANY_SET(&readfds)) {
       continue;
     }
@@ -94,7 +94,6 @@ int main(int argc, char *argv[]) {
       msg = (sbcp_msg_t *)recv_buf;
       msg_type = get_msg_type(*msg);
       if (msg_type == FWD) {
-        printf("fwd comes\n");
         parse_msg_fwd(*msg);
       } else if (msg_type == OFFLINE) {
         parse_msg_offline(*msg);
@@ -102,6 +101,8 @@ int main(int argc, char *argv[]) {
         parse_msg_online(*msg);
       } else if (msg_type == IDLE) {
         printf("%s is now idle.\n", msg->sbcp_attributes[0].payload);
+      } else {
+        printf("UNKNOWN MSG TYPE: %d\n", msg_type);
       }
     }
   }

@@ -290,7 +290,7 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
         sbcp_msg_t msg_send = make_msg_fwd(client_chat, 512, node->username,
                                            strlen(node->username) + 1);
 
-        msg_broadcast(node, listen_fd, msg_recv);
+        msg_broadcast(node, listen_fd, &msg_send);
       }
 
       if (msg_type == JOIN) {  // msg join, add to node

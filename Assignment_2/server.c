@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
     }
 
 
-    msg_router(listen_fd, readfds);
+    msg_router(listen_fd, readfds, max_clients);
     
     // printf("node traversal ends.\n");
   }  // while loop

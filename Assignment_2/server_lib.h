@@ -16,7 +16,7 @@ typedef struct socket_fd_t {
 
 void fd_select(fd_set *readfds, socket_fd_t listen_fd);
 
-void msg_router(socket_fd_t *listen_fd, fd_set readfds);
+void msg_router(socket_fd_t *listen_fd, fd_set readfds, int max_clients);
 
 void append_node(socket_fd_t **head_ref, int new_fd, char *new_username);
 

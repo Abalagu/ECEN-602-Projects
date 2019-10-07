@@ -232,7 +232,7 @@ int is_duplicate_name(socket_fd_t *listen_fd, char *new_name) {
   return 0;
 }
 
-// return number of clients in the chat
+// return number of clients in the nodes. should -1 if a chat has not joined
 int client_count(socket_fd_t *listen_fd) {
   int count = 0;
   socket_fd_t *node = listen_fd->next;
@@ -244,14 +244,15 @@ int client_count(socket_fd_t *listen_fd) {
 }
 
 // traverse through all nodes, recv possible msg
-void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
+void msg_router(socket_fd_t *listen_fd, fd_set readfds, int max_clients) {
   char buf[MAXDATASIZE];
   int new_fd;
   int numbytes, msg_type;
   char usernames[512] = {0};
   char new_name[16];
   int message_origin_fd = -1;
-  char reason[] = "same username";
+  char reason_duplicate[] = "same username";
+  char reason_maximum[] = "reached maximum client count";
   char client_chat[512] = {0};
 
   sbcp_msg_t msg_send, *msg_recv;
@@ -295,7 +296,16 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
 
       if (msg_type == JOIN) {  // msg join, add to node
         parse_msg_join(*msg_recv, new_name);
-        if (is_duplicate_name(listen_fd, new_name) == 0) {
+
+        // first check if reached max client, then check if is dupliate
+        if ((client_count(listen_fd) - 1) >= max_clients) {
+          printf("REACHED MAXIMUM CLIENT. %s REJECTED!\n", new_name);
+          msg_send = make_msg_nak(reason_maximum, sizeof(reason_maximum));
+          memcpy(buf, &msg_send, sizeof(msg_send));
+          numbytes = server_write(node->fd, buf);
+          close(node->fd);
+          remove_node(listen_fd, *node);
+        } else if (is_duplicate_name(listen_fd, new_name) == 0) {
           printf("%s ACCEPTED.\n", new_name);
           memcpy(node->username, new_name, 16);
           get_usernames(usernames, listen_fd);
@@ -307,8 +317,8 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
           msg_broadcast(node, listen_fd, &msg_send);
 
         } else {  // is duplicate, send NAK, close fd, then remove this node
-          printf("%s REJECTED!\n", new_name);
-          msg_send = make_msg_nak(reason, sizeof(reason));
+          printf("%s IS A DUPLICATE NAME. REJECTED!\n", new_name);
+          msg_send = make_msg_nak(reason_duplicate, sizeof(reason_duplicate));
           memcpy(buf, &msg_send, sizeof(msg_send));
           numbytes = server_write(node->fd, buf);
           close(node->fd);

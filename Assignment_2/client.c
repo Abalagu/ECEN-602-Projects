@@ -58,6 +58,10 @@ int main(int argc, char *argv[]) {
     if (!is_idle && idle_cumulation >= IDLE_TIMEOUT * 1000000) {
       printf("idle for more than %ds.\n", IDLE_TIMEOUT);
       is_idle = 1;
+      msg_send = make_msg_idle_c(my_name, strlen(my_name)+1);
+      memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
+      writen(sock_fd, buf, sizeof(sbcp_msg_t));
+
     }
 
     FD_ZERO(&readfds);

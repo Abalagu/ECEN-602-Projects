@@ -61,14 +61,11 @@ void parse_msg_fwd(sbcp_msg_t msg_fwd) {
 
 void parse_msg_nak(sbcp_msg_t msg_nak) {
   if (msg_nak.sbcp_attributes[0].sbcp_attribute_type == REASON) {
-    printf("Join rejected! NAK REASON: %s\n", msg_nak.sbcp_attributes[0].payload);
+    printf("Join rejected! NAK REASON: %s\n",
+           msg_nak.sbcp_attributes[0].payload);
   } else {
     printf("ATTRIBUTE ERROR. EXPECT REASON.\n");
   }
-}
-
-void parse_msg_offline(sbcp_msg_t msg_offline) {
-  printf("user %s is offline.\n", msg_offline.sbcp_attributes[0].payload);
 }
 
 int parse_msg_ack(sbcp_msg_t msg_ack, char *my_name) {
@@ -85,6 +82,15 @@ int parse_msg_ack(sbcp_msg_t msg_ack, char *my_name) {
 
 void parse_msg_online(sbcp_msg_t msg_online) {
   printf("user %s is back online.\n", msg_online.sbcp_attributes[0].payload);
+}
+
+void parse_msg_offline(sbcp_msg_t msg_offline) {
+  if (msg_offline.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
+    printf("%s has left the chat.\n",
+           msg_offline.sbcp_attributes[0].payload);
+  } else {
+    printf("MSG OFFLINE ATTR ERROR.\n");
+  }
 }
 
 void parse_msg_idle(sbcp_msg_t msg_idle) {

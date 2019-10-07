@@ -18,6 +18,9 @@ void parse_msg_nak(sbcp_msg_t msg_nak);
 int parse_msg_ack(sbcp_msg_t msg_ack, char *username);
 
 void parse_msg_fwd(sbcp_msg_t msg_fwd);
+
+void parse_msg_offline(sbcp_msg_t msg_offline);
+
 // int writen(int sockfd, char *buf);
 int writen(int sockfd, char *buf, size_t size_buf);
 

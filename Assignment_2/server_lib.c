@@ -246,6 +246,20 @@ int client_count(socket_fd_t *listen_fd) {
   }
   return count;
 }
+
+void offline_broadcast(socket_fd_t *listen_fd, sbcp_msg_t msg_offline) {
+  
+  char buf[MAXDATASIZE] = {0};
+  memcpy(buf, &msg_offline, sizeof(sbcp_msg_t));
+  socket_fd_t *node = listen_fd->next;
+
+  while (node != NULL) {
+    server_write(node->fd, buf);
+    printf("send to %s\n", node->username);
+    node = node->next;
+  }
+}
+
 // traverse through all nodes, recv possible msg
 void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char buf[MAXDATASIZE];
@@ -268,10 +282,13 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
     if (FD_ISSET(node->fd, &readfds)) {  // a client sends msg
       numbytes = server_read(node->fd, buf);
       if (numbytes == 0) {
-        printf("FIN received.\n");
-        close(node->fd);  // handle disconnection. should remove from node
+        // first make message, then close fd, then remove node, then traverse
+        // nodes to other clients
+        printf("%s has left the chat.\n", node->username);
+        msg_send = make_msg_offline(node->username, strlen(node->username) + 1);
+        close(node->fd);  // handle disconnection. should remove from nodes
         remove_node(listen_fd, *node);
-        // return;  // temporary handle of disconnection
+        offline_broadcast(listen_fd, msg_send);
       }
 
       // cast buffer to message

@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
   readline(sock_fd, recv_buf);
   sbcp_msg_t *msg = (sbcp_msg_t *)recv_buf;
   msg_type = get_msg_type(*msg);
+  // only deal with ACK and NAK, as not formally joined the chat yet
   if (msg_type == ACK) {
     if (parse_msg_ack(*msg, my_name) != 0) {
       return 0;  // message parse error.
@@ -82,6 +83,9 @@ int main(int argc, char *argv[]) {
       msg_type = get_msg_type(*msg);
       if (msg_type == FWD) {
         parse_msg_fwd(*msg);
+      } else if (msg_type == OFFLINE) {
+        printf("offline recved.\n");
+        parse_msg_offline(*msg);
       }
     }
   }

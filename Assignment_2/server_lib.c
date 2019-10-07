@@ -225,7 +225,6 @@ void msg_broadcast(socket_fd_t *current_node, socket_fd_t *head,
     }
     node = node->next;
   }
-  printf("broadcast end\n");
 }
 
 // traverse through all nodes, recv possible msg

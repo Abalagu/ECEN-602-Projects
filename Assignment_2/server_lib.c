@@ -202,15 +202,13 @@ void remove_node(socket_fd_t *listen_fd, socket_fd_t remove_node) {
 // nodes
 void msg_broadcast(socket_fd_t *current_node, socket_fd_t *head,
                    sbcp_msg_t *msg_recv) {
-
   char buf[MAXDATASIZE];
   char client_chat[512] = {0};
 
   parse_msg_send(*msg_recv, client_chat);
   printf("%s: %s\n", current_node->username, client_chat);
-  sbcp_msg_t msg_send =
-      make_msg_fwd(client_chat, 512, current_node->username,
-                   strlen(current_node->username) + 1);
+  sbcp_msg_t msg_send = make_msg_fwd(client_chat, 512, current_node->username,
+                                     strlen(current_node->username) + 1);
 
   memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
 
@@ -219,12 +217,23 @@ void msg_broadcast(socket_fd_t *current_node, socket_fd_t *head,
   int message_origin_fd = current_node->fd;
   socket_fd_t *node = head->next;
   while (node != NULL) {
-    if (node->fd != message_origin_fd) {     // if not from origin
-      server_write(node->fd, buf);  // broadcast to others
-      printf("send to %s\n", node->username);
+    if (node->fd != message_origin_fd) {  // if not from origin
+      server_write(node->fd, buf);        // broadcast to others
     }
     node = node->next;
   }
+}
+
+int is_duplicate_name(socket_fd_t *listen_fd, char *new_name) {
+  socket_fd_t *node = listen_fd->next;
+  while (node != NULL) {
+    if (strcmp(node->username, new_name) == 0) {  // duplicate detected.
+      return 1;
+    }
+    node = node->next;
+  }
+
+  return 0;
 }
 
 // traverse through all nodes, recv possible msg
@@ -235,6 +244,7 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char usernames[512] = {0};
   char new_name[16];
   int message_origin_fd = -1;
+  char reason[] = "same username";
 
   sbcp_msg_t msg_send, *msg_recv;
 
@@ -264,17 +274,20 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
 
       if (msg_type == JOIN) {  // msg join, add to node
         parse_msg_join(*msg_recv, new_name);
-        memcpy(node->username, new_name, 16);
-
-        get_usernames(usernames, listen_fd);
-        msg_send = make_msg_ack(1, usernames);
-        char reason[] = "same username";
-        // *msg_send = make_msg_nak(reason, sizeof(reason));
-        // memcpy(buf, &msg_nak, sizeof(msg_nak)); //SEND NAK TEST
-        memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
-
-        numbytes = server_write(node->fd, buf);
-        printf("sent ACK\n");
+        if (is_duplicate_name(listen_fd, new_name) == 0) {
+          memcpy(node->username, new_name, 16);
+          get_usernames(usernames, listen_fd);
+          msg_send = make_msg_ack(1, usernames);
+          memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
+          numbytes = server_write(node->fd, buf);
+        } else {  // is duplicate, send NAK, close fd, then remove this node
+          printf("REJECTED!\n");
+          msg_send = make_msg_nak(reason, sizeof(reason));
+          memcpy(buf, &msg_send, sizeof(msg_send));  // SEND NAK TEST
+          close(node->fd);
+          remove_node(listen_fd, *node);
+        
+        };
       }
     }  // if fd in node is set
     node = node->next;

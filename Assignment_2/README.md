@@ -24,15 +24,25 @@
 
 ## Program Architecture:
 
+### Parsing Libraries
+
+* server_lib.c and client_lib.c provides message construction and parsing utilities for server and client respectively.
+* config.h file includes message exchange format and configurations.
+
 ### Server
 
 * server monitors multiple file descriptor(fd) using select to accept new client, while at the same time read and forward message to other clients.
-* server associates each fd with a client's username, and controls maximum number of clients in the chat.
+* server associates each fd with a client's username by maintaining a linked list of struct with fd, username and next struct as its members. When a message is sent to the server, it traverses through all the clients and send each with a FWD message. Server count number of nodes in the linked list to control maximum number of clients in the chat.
 
 ### Client
 
 * client is using select to monitor FWD message and STDIN at the same time.
 * message is packaged in fixed length struct, supports multiple attributes.
+
+### Bonus Points
+* Both server and client support IPv4 and IPv6 connection.
+* ACK, NAK, ONLINE, and OFFLINE message types are supported, test cases for each are included.
+* IDLE status in client is supported by accumulating time elapse from select call, and will send an IDLE message to server when it goes idle.  Sending message from client again will recover itself from IDLE status, and can fall IDLE again after another 10 seconds of no action.
 
 ## Test Cases
 

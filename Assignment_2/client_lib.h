@@ -4,6 +4,7 @@
 #include "common_lib.h"
 #include "config.h"
 #define SELECT_TIMEOUT 2
+
 #define IDLE_TIMEOUT 10
 
 int update_idle_time(int idle_cumulation, struct timeval tv, int is_idle);

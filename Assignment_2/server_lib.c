@@ -164,6 +164,7 @@ void parse_msg_join(sbcp_msg_t msg_join, char *new_name) {
   }
 }
 
+// empty message, nothing to parse.
 void parse_msg_idle(sbcp_msg_t msg_idle) {}
 
 void parse_msg_send(sbcp_msg_t msg_send, char *client_message) {
@@ -278,6 +279,11 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
       // cast buffer to message
       msg_recv = (sbcp_msg_t *)buf;
       msg_type = get_msg_type(*msg_recv);
+      if (msg_type == IDLE) {
+        printf("%s is idle.\n", node->username);
+        msg_send = make_msg_idle_s(node->username, strlen(node->username));
+        msg_broadcast(node, listen_fd, &msg_send);
+      }
 
       if (msg_type == SEND) {  // msg send, fwd to others
         parse_msg_send(*msg_recv, client_chat);
@@ -298,7 +304,7 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
           memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
           numbytes = server_write(node->fd, buf);
 
-          msg_send = make_msg_online(new_name, strlen(new_name)+1);
+          msg_send = make_msg_online(new_name, strlen(new_name) + 1);
           msg_broadcast(node, listen_fd, &msg_send);
 
         } else {  // is duplicate, send NAK, close fd, then remove this node

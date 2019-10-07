@@ -58,10 +58,9 @@ int main(int argc, char *argv[]) {
     if (!is_idle && idle_cumulation >= IDLE_TIMEOUT * 1000000) {
       printf("idle for more than %ds.\n", IDLE_TIMEOUT);
       is_idle = 1;
-      msg_send = make_msg_idle_c(my_name, strlen(my_name)+1);
+      msg_send = make_msg_idle_c(my_name, strlen(my_name) + 1);
       memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
       writen(sock_fd, buf, sizeof(sbcp_msg_t));
-
     }
 
     FD_ZERO(&readfds);
@@ -71,12 +70,13 @@ int main(int argc, char *argv[]) {
     tv.tv_usec = 0;
     select(sock_fd + 1, &readfds, NULL, NULL, &tv);
     idle_cumulation = update_idle_time(idle_cumulation, tv, is_idle);
-
+    printf("after update\n");
     if (!FD_IS_ANY_SET(&readfds)) {
       continue;
     }
     if (FD_ISSET(STDIN, &readfds)) {
-      idle_cumulation = 1000000;  // reinit idle tolerance
+      idle_cumulation = 0;  // reinit idle tolerance
+      is_idle = 0;
       fgets(send_buf, MAX_MSG_LEN - 1, stdin);
       // from SO, use strcspn to remove \n from stdin read
       send_buf[strcspn(send_buf, "\n")] = 0;
@@ -94,11 +94,14 @@ int main(int argc, char *argv[]) {
       msg = (sbcp_msg_t *)recv_buf;
       msg_type = get_msg_type(*msg);
       if (msg_type == FWD) {
+        printf("fwd comes\n");
         parse_msg_fwd(*msg);
       } else if (msg_type == OFFLINE) {
         parse_msg_offline(*msg);
       } else if (msg_type == ONLINE) {
         parse_msg_online(*msg);
+      } else if (msg_type == IDLE) {
+        printf("%s is now idle.\n", msg->sbcp_attributes[0].payload);
       }
     }
   }

@@ -167,6 +167,7 @@ void parse_msg_join(sbcp_msg_t msg_join, char *new_name) {
 void parse_msg_idle(sbcp_msg_t msg_idle) {}
 
 void parse_msg_send(sbcp_msg_t msg_send, char *client_message) {
+  memset(client_message, 0, 512);
   memcpy(client_message, msg_send.sbcp_attributes[0].payload, 512);
   // printf("msg: %s\n", );
 }
@@ -201,16 +202,11 @@ void remove_node(socket_fd_t *listen_fd, socket_fd_t remove_node) {
 // given current node, head node, and message, broadcast message to all other
 // nodes
 void msg_broadcast(socket_fd_t *current_node, socket_fd_t *head,
-                   sbcp_msg_t *msg_recv) {
+                   sbcp_msg_t *msg_send) {
   char buf[MAXDATASIZE];
   char client_chat[512] = {0};
 
-  parse_msg_send(*msg_recv, client_chat);
-  printf("%s: %s\n", current_node->username, client_chat);
-  sbcp_msg_t msg_send = make_msg_fwd(client_chat, 512, current_node->username,
-                                     strlen(current_node->username) + 1);
-
-  memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
+  memcpy(buf, msg_send, sizeof(sbcp_msg_t));
 
   // record current node fd, skip sending to message origin
   // head node is server
@@ -247,19 +243,6 @@ int client_count(socket_fd_t *listen_fd) {
   return count;
 }
 
-void offline_broadcast(socket_fd_t *listen_fd, sbcp_msg_t msg_offline) {
-  
-  char buf[MAXDATASIZE] = {0};
-  memcpy(buf, &msg_offline, sizeof(sbcp_msg_t));
-  socket_fd_t *node = listen_fd->next;
-
-  while (node != NULL) {
-    server_write(node->fd, buf);
-    printf("send to %s\n", node->username);
-    node = node->next;
-  }
-}
-
 // traverse through all nodes, recv possible msg
 void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char buf[MAXDATASIZE];
@@ -269,6 +252,7 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
   char new_name[16];
   int message_origin_fd = -1;
   char reason[] = "same username";
+  char client_chat[512] = {0};
 
   sbcp_msg_t msg_send, *msg_recv;
 
@@ -286,15 +270,20 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
         // nodes to other clients
         printf("%s has left the chat.\n", node->username);
         msg_send = make_msg_offline(node->username, strlen(node->username) + 1);
+        msg_broadcast(node, listen_fd, &msg_send);
         close(node->fd);  // handle disconnection. should remove from nodes
         remove_node(listen_fd, *node);
-        offline_broadcast(listen_fd, msg_send);
       }
 
       // cast buffer to message
       msg_recv = (sbcp_msg_t *)buf;
       msg_type = get_msg_type(*msg_recv);
+
       if (msg_type == SEND) {  // msg send, fwd to others
+        parse_msg_send(*msg_recv, client_chat);
+        printf("%s: %s\n", node->username, client_chat);
+        sbcp_msg_t msg_send = make_msg_fwd(client_chat, 512, node->username,
+                                           strlen(node->username) + 1);
 
         msg_broadcast(node, listen_fd, msg_recv);
       }
@@ -306,12 +295,16 @@ void msg_router(socket_fd_t *listen_fd, fd_set readfds) {
           memcpy(node->username, new_name, 16);
           get_usernames(usernames, listen_fd);
           msg_send = make_msg_ack(client_count(listen_fd) - 1, usernames);
-          memcpy(buf, &msg_send, sizeof(sbcp_msg_t));  // SEND ACK TEST
+          memcpy(buf, &msg_send, sizeof(sbcp_msg_t));
           numbytes = server_write(node->fd, buf);
+
+          msg_send = make_msg_online(new_name, strlen(new_name)+1);
+          msg_broadcast(node, listen_fd, &msg_send);
+
         } else {  // is duplicate, send NAK, close fd, then remove this node
           printf("%s REJECTED!\n", new_name);
           msg_send = make_msg_nak(reason, sizeof(reason));
-          memcpy(buf, &msg_send, sizeof(msg_send));  // SEND NAK TEST
+          memcpy(buf, &msg_send, sizeof(msg_send));
           close(node->fd);
           remove_node(listen_fd, *node);
         };

@@ -81,13 +81,16 @@ int parse_msg_ack(sbcp_msg_t msg_ack, char *my_name) {
 }
 
 void parse_msg_online(sbcp_msg_t msg_online) {
-  printf("user %s is back online.\n", msg_online.sbcp_attributes[0].payload);
+  if (msg_online.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
+    printf("%s has joined the chat.\n", msg_online.sbcp_attributes[0].payload);
+  } else {
+    printf("MSG ONLINE ATTR ERROR.\n");
+  }
 }
 
 void parse_msg_offline(sbcp_msg_t msg_offline) {
   if (msg_offline.sbcp_attributes[0].sbcp_attribute_type == USERNAME) {
-    printf("%s has left the chat.\n",
-           msg_offline.sbcp_attributes[0].payload);
+    printf("%s has left the chat.\n", msg_offline.sbcp_attributes[0].payload);
   } else {
     printf("MSG OFFLINE ATTR ERROR.\n");
   }

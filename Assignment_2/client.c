@@ -84,8 +84,9 @@ int main(int argc, char *argv[]) {
       if (msg_type == FWD) {
         parse_msg_fwd(*msg);
       } else if (msg_type == OFFLINE) {
-        printf("offline recved.\n");
         parse_msg_offline(*msg);
+      } else if(msg_type == ONLINE){
+        parse_msg_online(*msg);
       }
     }
   }

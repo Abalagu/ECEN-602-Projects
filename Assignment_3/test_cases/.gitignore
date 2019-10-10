@@ -12,3 +12,6 @@
 
 # Unignore .sh files
 !./*.sh
+
+# Unignore Makefile
+!Makefile

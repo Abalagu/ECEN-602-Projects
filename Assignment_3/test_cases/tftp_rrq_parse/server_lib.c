@@ -1,8 +1,50 @@
 #include "server_lib.h"
 
-void print_hex(char *array, size_t len) {
+tftp_error_t parse_rrq(char *buf, size_t len) {
+  // count instance of 0, expect 3, otherwise it's a corrupt RRQ message
+  int count = 0;
+  int position[3] = {-1};
+
   for (int i = 0; i < len; i++) {
-    printf(" %02x", array[i]);
+    if (buf[i] == 0) {
+      position[count] = i;
+      count += 1;
+    }
+    if (count > 3) {  // corrupt RRQ message
+      return CORRUPT;
+    }
+  }
+
+  return OK;
+}
+
+// get type from UDP packet. return -1 for unknown packet type.
+opcode_t get_type(char *packet, size_t packet_len) {
+  uint8_t opcode;
+  if (packet[0] != 0) {
+    return UNDEFINED;
+  }
+  memcpy(&opcode, packet + 1, 1);  // copy second byte to opcode
+  switch (opcode) {
+    case RRQ:
+      return RRQ;
+    case WRQ:
+      return WRQ;
+    case DATA:
+      return DATA;
+    case ACK:
+      return ACK;
+    case ERROR:
+      return ERROR;
+    default:
+      return UNDEFINED;
+  }
+}
+
+void print_hex(void *array, size_t len) {
+  char *parray = array;
+  for (int i = 0; i < len; i++) {
+    printf(" %02x", parray[i]);
   }
   printf("\n");
 }

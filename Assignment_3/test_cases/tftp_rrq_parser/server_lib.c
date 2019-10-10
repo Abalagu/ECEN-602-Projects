@@ -3,8 +3,8 @@
 // given rrq packet, return filename and mode
 tftp_error_t parse_rrq(char *packet, size_t len, char *filename,
                        tftp_mode_t *mode) {
-  char octet[] = "octet";
-  char netascii[] = "netascii";
+  char octet[] = "OCTET";
+  char netascii[] = "NETASCII";
 
   // count instance of 0, expect 3, otherwise it's a corrupt RRQ message
   int count = 0;
@@ -25,10 +25,10 @@ tftp_error_t parse_rrq(char *packet, size_t len, char *filename,
   memcpy(filename, packet + 2, name_len);  // offset due to opcode
 
   // extract mode from RRQ packet
-  if (TFTP_OK == strncmp(packet + position[1] + 1, octet, strlen(octet))) {
+  if (TFTP_OK == strncasecmp(packet + position[1] + 1, octet, strlen(octet))) {
     *mode = OCTET;
-  } else if (TFTP_OK ==
-             strncmp(packet + position[1] + 1, netascii, strlen(netascii))) {
+  } else if (TFTP_OK == strncasecmp(packet + position[1] + 1, netascii,
+                                    strlen(netascii))) {
     *mode = NETASCII;
   } else {
     *mode = -1;

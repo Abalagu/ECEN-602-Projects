@@ -17,8 +17,8 @@
 
 #define MAXBUFLEN 100
 
-void print_hex(char *array) {
-  for (int i = 0; i < sizeof array; i++) {
+void print_hex(char *array, size_t len) {
+  for (int i = 0; i < len; i++) {
     printf(" %02x", array[i]);
   }
   printf("\n");
@@ -100,7 +100,7 @@ int main(void) {
     printf("listener: packet is %d bytes long\n", numbytes);
     buf[numbytes] = '\0';
     printf("listener: packet contains \"%s\"\n", buf);
-    print_hex(buf);
+    print_hex(buf, numbytes);
   }
   close(sockfd);
 

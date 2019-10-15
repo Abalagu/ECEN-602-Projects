@@ -8,14 +8,18 @@ int main() {
     init();
     listen();
     // if connection
-    fork() {
-        // create a new socket;
-        close(fd) // close 69
-        parse();
-        if put
-            decline()
-        else if get
+    parse();
+    if put
+        decline()
+    else if get
+ 
+        fork() {
+            // create a new socket;
+            close(fd) // close 69
             // serve the request;
-            senddata();
-    }
+            while(1)
+                senddata();
+                wait for the ack();
+
+        }
 }

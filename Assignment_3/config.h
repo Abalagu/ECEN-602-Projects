@@ -1,5 +1,5 @@
-#ifndef HEADERS_H_
-#define HEADERS_H_
+#ifndef CONFIG_H_ 
+#define CONFIG_H_ 
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,4 +16,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#define DEBUG 1
+
+#define PORT "4950"
+#define MAXBUFLEN 512 
+
+
 #endif

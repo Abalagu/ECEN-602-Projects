@@ -1,6 +1,6 @@
 
 C = gcc
-DEPS = headers.h  
+DEPS = config.h lib.h 
 
 TARGETS = server 
 

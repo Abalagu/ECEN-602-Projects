@@ -18,5 +18,10 @@ typedef struct
 	char trail_buf[MAXBUFLEN];
 }tftp_header_t;
 
+/* IPv4 or IPv6 */
+void *get_in_addr(struct sockaddr *);
+
+/* initialize server */
+int init();
 
 #endif

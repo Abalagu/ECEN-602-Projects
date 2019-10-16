@@ -1,121 +1,64 @@
 #include "config.h"
 #include "lib.h"
 
-void *get_in_addr(struct sockaddr *sa) {
-  if (sa->sa_family == AF_INET) {
-		return &(((struct sockaddr_in*)sa)->sin_addr);
-  }
-  return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
 
+int main(int argc, char* argv[]) {
+	
+	//TODO:: validate passed args
 
-int init() {
-	int sockfd;
-  struct  addrinfo hints, *servinfo, *p;
-  int rv;
-  int numbytes;
-  memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_flags = AI_PASSIVE; // use my IP
+  char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN];
+  int sockfd, numbytes;
+	char mode[8]; // netascii, octet or mail, should never exceed 8 bytes
 
-  if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
- 		return 1;
-  }
-
-  // loop through all the results and bind to the first we can
-  for(p = servinfo; p != NULL; p = p->ai_next) {
-    if ((sockfd = socket(p->ai_family, p->ai_socktype,
-    	p->ai_protocol)) == -1) {
-      perror("listener: socket");
-      continue;
-    }
-
-   	if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-      close(sockfd);
-      perror("listener: bind");
-      continue;
-    }
-
-    break;
-  }
-
-  if (p == NULL) {
-    return 2;
-  }
-
-  freeaddrinfo(servinfo);
-
-  return sockfd;
-    
-}
-
-int main() {
-  char s[INET6_ADDRSTRLEN];
-  char buf[MAXBUFLEN];
-	char *rbuf;
-  int numbytes;
-	char filename[MAXBUFLEN];
-	char mode[8]; // netascii, octet or mail
-  socklen_t addr_len;
 	opcode_t opcode;
+
+  socklen_t addr_len;
   struct sockaddr_storage their_addr;
-  int sockfd;
-
-  sockfd = init();
-
-  printf("listener: waiting to recvfrom \n");
-
   addr_len =  sizeof their_addr;
 
+	/* initialize the server */
+  sockfd = init();
+  printf("server: waiting to recvfrom \n");
+
   if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0, 
-      (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-      perror("recvform");
-      exit(1);
+    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("recvform");
+    exit(1);
   }
 
-  printf("listner: got packet from %s \n",
-      inet_ntop(their_addr.ss_family, get_in_addr((struct  sockaddr *)&their_addr),
-      s, sizeof s));
+  printf("server: got packet from %s \n",
+    inet_ntop(their_addr.ss_family, get_in_addr((struct  sockaddr *)&their_addr),
+    s, sizeof s));
 
+  // buf[numbytes] = '\0';
 	if (DEBUG) {
   	printf("[Packet size] %d\n", numbytes);
+  	printf("[Packet content] : \n" );
+  	for (int i = 0; i < numbytes; i++) {
+			printf(" [%d]:", i);
+      printf(" %d %c\n",buf[i], buf[i]);
+  	} 
 	}
 
-  buf[numbytes] = '\0';
-	// for (int i = 0; i < numbytes; i++) {
-  //     printf("%d", buf[i]);
-  // } 
-  printf("listener: packet contains : \n" );
-	// memcpy(tftp_header, buf, 16);
-  for (int i = 0; i < numbytes; i++) {
-			printf("%d:", i);
-      printf("%d %c\n",buf[i], buf[i]);
-			// memcpy(rbuf * i + 16, buf, )
-  } 
-
 	tftp_header_t *tftp_header= (tftp_header_t *) buf;
-	opcode = (tftp_header->opcode) >> 8;
-	// this will give me two byte opcode and the rest of the 
-	// buffer in the finename array.
-	// then read that filename array into a string untill you encounter a space,
-	// then read the mode and move
-	// opcode = 1;
-	if (DEBUG)	
-		printf("[Opcode] %d\n", opcode);
+	/* extract opcode */
+	opcode = (tftp_header->opcode) >> 8; 									
 
-	// for (int i = 0; i < numbytes; i++) {
-  //     printf("%d \n",tftp_header->buf_rem.filename[i]);
-  // } 
+	if (DEBUG) {	
+		printf("[Opcode] %d\n", opcode);
+	} 
+	
+	/* trailing buffer now has filename and the mode. According to RFC, the file
+		name is followed by a 0. Locate that 0 */
 	char *pos_ptr = strchr(tftp_header->trail_buf, 0);
 	int pos = (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
 
 	if (pos < 0) {
 		perror("filename not valid\n");
+		//TODO:: send an error.
 	}
 
-	printf("pos:%d\n", pos);
+	/* extract filename from the trail buffer */
   memcpy(filename, tftp_header->trail_buf, pos);
 	
 	if (DEBUG) {
@@ -126,19 +69,7 @@ int main() {
 		printf("\n");
 	}
 
-	printf("[trailing header] ");
-	for (int i = 0; i < numbytes; i++) {
- 		printf("%d \n",tftp_header->trail_buf[i]);
-	}	
-	printf("\n");
-
-	pos_ptr = strrchr(tftp_header->trail_buf, 0);
-	int last_pos =  (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
-	
-	if (last_pos < 0) {
-		perror("filename not valid\n");
-	}
-	printf("last_pos:%d\n", last_pos);
+	/* rest of the buffer has mode */	
 	memcpy(mode, &(tftp_header->trail_buf[pos+1]), sizeof mode);
 
 	if (DEBUG) {
@@ -148,9 +79,6 @@ int main() {
 		}
 		printf("\n");
 	}
-
-
-
 
 	switch (opcode) {
 	case RRQ: 
@@ -176,7 +104,5 @@ int main() {
 
 
   close(sockfd);
-
   return 0;
-
 }

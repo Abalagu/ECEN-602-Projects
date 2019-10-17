@@ -1,43 +1,40 @@
 #include "config.h"
 #include "lib.h"
 
-
 int main(int argc, char* argv[]) {
-	
-	//TODO:: validate passed args
-
-  char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN];
-  int sockfd, numbytes;
+//TODO:: validate passed args
+	char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN];
+	int sockfd, numbytes;
 	char mode[8]; // netascii, octet or mail, should never exceed 8 bytes
 
 	opcode_t opcode;
 
-  socklen_t addr_len;
-  struct sockaddr_storage their_addr;
-  addr_len =  sizeof their_addr;
+	socklen_t addr_len;
+	struct sockaddr_storage their_addr;
+	addr_len =  sizeof their_addr;
 
 	/* initialize the server */
-  sockfd = init();
-  printf("server: waiting to recvfrom \n");
+	sockfd = init();
+	printf("server: waiting to recvfrom \n");
 
-  if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0, 
-    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-    perror("recvform");
-    exit(1);
-  }
+	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0, 
+		(struct sockaddr *)&their_addr, &addr_len)) == -1) {
+		perror("recvform");
+		exit(1);
+	}
 
-  printf("server: got packet from %s \n",
-    inet_ntop(their_addr.ss_family, get_in_addr((struct  sockaddr *)&their_addr),
-    s, sizeof s));
+	printf("server: got packet from %s \n",
+		inet_ntop(their_addr.ss_family, get_in_addr((struct  sockaddr *)&their_addr),
+		s, sizeof s));
 
-  // buf[numbytes] = '\0';
+	// buf[numbytes] = '\0';
 	if (DEBUG) {
-  	printf("[Packet size] %d\n", numbytes);
-  	printf("[Packet content] : \n" );
-  	for (int i = 0; i < numbytes; i++) {
+		printf("[Packet size] %d\n", numbytes);
+		printf("[Packet content] : \n" );
+		for (int i = 0; i < numbytes; i++) {
 			printf(" [%d]:", i);
-      printf(" %d %c\n",buf[i], buf[i]);
-  	} 
+			printf(" %d %c\n",buf[i], buf[i]);
+		} 
 	}
 
 	tftp_header_t *tftp_header= (tftp_header_t *) buf;
@@ -59,12 +56,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	/* extract filename from the trail buffer */
-  memcpy(filename, tftp_header->trail_buf, pos);
+	memcpy(filename, tftp_header->trail_buf, pos);
 	
 	if (DEBUG) {
 		printf("[Passed filename] ");
 		for (int i = 0; i < pos; i++) {
-      printf("%c",filename[i]);
+			printf("%c",filename[i]);
 		}
 		printf("\n");
 	}
@@ -75,7 +72,7 @@ int main(int argc, char* argv[]) {
 	if (DEBUG) {
 		printf("[Mode] ");
 		for (int i = 0; i < 8; i++) {
-      printf("%c",mode[i]);
+			printf("%c",mode[i]);
 		}
 		printf("\n");
 	}
@@ -103,6 +100,6 @@ int main(int argc, char* argv[]) {
 	}
 
 
-  close(sockfd);
-  return 0;
+	close(sockfd);
+	return 0;
 }

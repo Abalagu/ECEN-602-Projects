@@ -1,4 +1,3 @@
-
 C = gcc
 DEPS = config.h lib.h 
 

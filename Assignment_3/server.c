@@ -1,88 +1,108 @@
-#include "headers.h"
-
-#define PORT "4950"
-#define MAXBUFLEN 512
-
-void *get_in_addr(struct sockaddr *sa) {
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
+#include "config.h"
+#include "lib.h"
 
 
-int init() {
-    int sockfd;
-    struct  addrinfo hints, *servinfo, *p;
-    int rv;
-    int numbytes;
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_PASSIVE; // use my IP
+int main(int argc, char* argv[]) {
+	
+	//TODO:: validate passed args
 
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
-    }
+  char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN];
+  int sockfd, numbytes;
+	char mode[8]; // netascii, octet or mail, should never exceed 8 bytes
 
-    // loop through all the results and bind to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("listener: socket");
-            continue;
-        }
+	opcode_t opcode;
 
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("listener: bind");
-            continue;
-        }
+  socklen_t addr_len;
+  struct sockaddr_storage their_addr;
+  addr_len =  sizeof their_addr;
 
-        break;
-    }
+	/* initialize the server */
+  sockfd = init();
+  printf("server: waiting to recvfrom \n");
 
-    if (p == NULL) {
-        return 2;
-    }
+  if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0, 
+    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("recvform");
+    exit(1);
+  }
 
-    freeaddrinfo(servinfo);
+  printf("server: got packet from %s \n",
+    inet_ntop(their_addr.ss_family, get_in_addr((struct  sockaddr *)&their_addr),
+    s, sizeof s));
 
-    return sockfd;
-    
-}
+  // buf[numbytes] = '\0';
+	if (DEBUG) {
+  	printf("[Packet size] %d\n", numbytes);
+  	printf("[Packet content] : \n" );
+  	for (int i = 0; i < numbytes; i++) {
+			printf(" [%d]:", i);
+      printf(" %d %c\n",buf[i], buf[i]);
+  	} 
+	}
 
-int main() {
-    char s[INET6_ADDRSTRLEN];
-    char buf[MAXBUFLEN];
-    int numbytes;
-    socklen_t addr_len;
-    struct sockaddr_storage their_addr;
-    int sockfd;
+	tftp_header_t *tftp_header= (tftp_header_t *) buf;
+	/* extract opcode */
+	opcode = (tftp_header->opcode) >> 8; 									
 
-    sockfd = init();
+	if (DEBUG) {	
+		printf("[Opcode] %d\n", opcode);
+	} 
+	
+	/* trailing buffer now has filename and the mode. According to RFC, the file
+		name is followed by a 0. Locate that 0 */
+	char *pos_ptr = strchr(tftp_header->trail_buf, 0);
+	int pos = (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
 
-    printf("listener: waiting to recvfrom \n");
+	if (pos < 0) {
+		perror("filename not valid\n");
+		//TODO:: send an error.
+	}
 
-    addr_len =  sizeof their_addr;
+	/* extract filename from the trail buffer */
+  memcpy(filename, tftp_header->trail_buf, pos);
+	
+	if (DEBUG) {
+		printf("[Passed filename] ");
+		for (int i = 0; i < pos; i++) {
+      printf("%c",filename[i]);
+		}
+		printf("\n");
+	}
 
-    if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0, 
-        (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-        perror("recvform");
-        exit(1);
-    }
+	/* rest of the buffer has mode */	
+	memcpy(mode, &(tftp_header->trail_buf[pos+1]), sizeof mode);
 
-    printf("listner: got packet from %s \n",
-        inet_ntop(their_addr.ss_family, get_in_addr((struct  sockaddr *)&their_addr),
-        s, sizeof s));
-    
-    printf("listener: packet is %d bytes long\n", numbytes);
-    buf[numbytes] = '\0';
-    printf("listener: packet contains \"%s\"\n", buf);
+	if (DEBUG) {
+		printf("[Mode] ");
+		for (int i = 0; i < 8; i++) {
+      printf("%c",mode[i]);
+		}
+		printf("\n");
+	}
 
-    close(sockfd);
+	switch (opcode) {
+	case RRQ: 
+		printf("[Read request] \n");
+		break;
+	
+	case WRQ:
+		printf("[Write request] \n");
+		break;
 
-    return 0;
+	case DATA:
+		break;
 
+	case ACK:
+		break;
+
+	case ERROR:
+		break;
+
+	default:
+		break;
+	}
+
+
+  close(sockfd);
+  return 0;
 }

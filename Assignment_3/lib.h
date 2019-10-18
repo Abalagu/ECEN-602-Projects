@@ -24,4 +24,7 @@ void *get_in_addr(struct sockaddr *);
 /* initialize server */
 int init(char *port);
 
+/* header parser*/
+opcode_t parse_header(char buf[MAXBUFLEN], char filename[MAXBUFLEN], char mode[8]);
+
 #endif

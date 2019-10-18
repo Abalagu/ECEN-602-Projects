@@ -44,45 +44,8 @@ int main(int argc, char* argv[]) {
 		} 
 	}
 
-	tftp_header_t *tftp_header= (tftp_header_t *) buf;
-	/* extract opcode */
-	opcode = (tftp_header->opcode) >> 8; 									
-
-	if (DEBUG) {	
-		printf("[Opcode] %d\n", opcode);
-	} 
-	
-	/* trailing buffer now has filename and the mode. According to RFC, the file
-		name is followed by a 0. Locate that 0 */
-	char *pos_ptr = strchr(tftp_header->trail_buf, 0);
-	int pos = (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
-
-	if (pos < 0) {
-		perror("filename not valid\n");
-		//TODO:: send an error.
-	}
-
-	/* extract filename from the trail buffer */
-	memcpy(filename, tftp_header->trail_buf, pos);
-	
-	if (DEBUG) {
-		printf("[Passed filename] ");
-		for (int i = 0; i < pos; i++) {
-			printf("%c",filename[i]);
-		}
-		printf("\n");
-	}
-
-	/* rest of the buffer has mode */	
-	memcpy(mode, &(tftp_header->trail_buf[pos+1]), sizeof mode);
-
-	if (DEBUG) {
-		printf("[Mode] ");
-		for (int i = 0; i < 8; i++) {
-			printf("%c",mode[i]);
-		}
-		printf("\n");
-	}
+	/* parse the received header */
+	opcode = parse_header(buf, filename, mode);
 
 	switch (opcode) {
 	case RRQ: 

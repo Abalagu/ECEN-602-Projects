@@ -46,3 +46,50 @@ int init(char *port) {
 	freeaddrinfo(servinfo);
 	return sockfd;
 }
+
+opcode_t parse_header(char buf[MAXBUFLEN], char filename[MAXBUFLEN], char mode[8]) {
+	/* parse the buffer and fill in filename and mode and return the opcode */	
+
+	tftp_header_t *tftp_header= (tftp_header_t *) buf;
+	/* extract opcode */
+	opcode_t opcode = (tftp_header->opcode) >> 8; 									
+
+	if (DEBUG) {	
+		printf("[Opcode] %d\n", opcode);
+	} 
+	
+	/* trailing buffer now has filename and the mode. According to RFC, the file
+		name is followed by a 0. Locate that 0 */
+	char *pos_ptr = strchr(tftp_header->trail_buf, 0);
+	/* in case pos reaches the end of the file, it's a problem */
+	int pos = (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
+
+	if (pos < 0) {
+		perror("filename not valid\n");
+		//TODO:: send an error.
+	}
+
+	/* extract filename from the trail buffer */
+	memcpy(filename, tftp_header->trail_buf, pos);
+	
+	if (DEBUG) {
+		printf("[Passed filename] ");
+		for (int i = 0; i < pos; i++) {
+			printf("%c",filename[i]);
+		}
+		printf("\n");
+	}
+
+	/* rest of the buffer has mode */	
+	memcpy(mode, &(tftp_header->trail_buf[pos+1]), 8*sizeof(char));
+
+	if (DEBUG) {
+		printf("[Mode] ");
+		for (int i = 0; i < 8; i++) {
+			printf("%c",mode[i]);
+		}
+		printf("\n");
+	}
+
+	return opcode;
+}

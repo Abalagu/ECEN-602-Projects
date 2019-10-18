@@ -1,4 +1,30 @@
-# TFTP Test Cases
+TFTP Server
 
-write test cases to familiar with system calls on UDP
 
+- Server
+
+int main() {
+
+	init();
+	recvfrom()
+	// if connection
+	fork() {
+		parse();
+		if put
+			decline()
+		else if get
+			// grant the access
+
+		// create a new socket;
+
+		close(fd) // close 69
+		// serve the request;
+		while(1)
+			rv = read_from_the_default_file_location();
+			if rv = 1
+				senddata();
+			else
+				a
+			wait for the ack();
+	}
+}

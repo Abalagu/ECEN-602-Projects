@@ -19,7 +19,6 @@
 
 #define DEBUG 1
 
-#define PORT "4950"
 #define MAXBUFLEN 512 
 
 

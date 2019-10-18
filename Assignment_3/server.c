@@ -2,7 +2,6 @@
 #include "lib.h"
 
 int main(int argc, char* argv[]) {
-//TODO:: validate passed args
 	if(argc != 2){
 		printf("usage: ./server port\n");
 		return 1;

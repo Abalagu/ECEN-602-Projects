@@ -22,6 +22,6 @@ typedef struct
 void *get_in_addr(struct sockaddr *);
 
 /* initialize server */
-int init();
+int init(char *port);
 
 #endif

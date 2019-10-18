@@ -3,6 +3,13 @@
 
 int main(int argc, char* argv[]) {
 //TODO:: validate passed args
+	if(argc != 2){
+		printf("usage: ./server port\n");
+		return 1;
+	}
+	char *port;
+	port = argv[1];
+
 	char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN];
 	int sockfd, numbytes;
 	char mode[8]; // netascii, octet or mail, should never exceed 8 bytes
@@ -14,7 +21,7 @@ int main(int argc, char* argv[]) {
 	addr_len =  sizeof their_addr;
 
 	/* initialize the server */
-	sockfd = init();
+	sockfd = init(port);
 	printf("server: waiting to recvfrom \n");
 
 	if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1, 0, 

@@ -1,4 +1,11 @@
+# Ignore all
+*
+
+# Unginore all with extensions
+!*.*
+
+# Ignore all .o files
 *.o
-test
-.vscode/*
-server
+
+# Ignore IDE config
+.vscode/

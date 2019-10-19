@@ -7,6 +7,19 @@ void *get_in_addr(struct sockaddr *sa) {
   return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
+int get_sock_port(int sockfd) {
+  struct sockaddr_in sin;
+  int addrlen = sizeof(sin);
+  if (getsockname(sockfd, (struct sockaddr *)&sin, &addrlen) == 0 &&
+      sin.sin_family == AF_INET && addrlen == sizeof(sin)) {
+    int local_port = ntohs(sin.sin_port);
+    return local_port;
+  } else {
+    printf("find port error.\n");
+    return -1;
+  }
+}
+
 int init(char *port) {
   int sockfd, rv, numbytes;
   struct addrinfo hints, *servinfo, *p;
@@ -28,21 +41,19 @@ int init(char *port) {
       perror("listener: socket");
       continue;
     }
-
     if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
       close(sockfd);
       perror("listener: bind");
       continue;
     }
-
     break;
   }
-
   if (p == NULL) {
     return 2;
   }
 
   freeaddrinfo(servinfo);
+  printf("assigned port: %d\n", get_sock_port(sockfd));
   return sockfd;
 }
 
@@ -56,33 +67,59 @@ void print_hex(void *array, size_t len) {
 
 int read_block(char *filename, char *buf) {
 
-  int fd;
-  // get file size
-  struct stat st;
-  print_hex(filename, strlen(filename));
-  fd = open(filename, O_RDONLY);
-  if (fd == -1) {
+  FILE *fp;
+
+  fp = fopen(filename, "r");
+  if (fp == NULL) {
     printf("file: %s. open failed.\n", filename);
     return 1;
   }
-  stat(filename, &st);
-  off_t size = st.st_size;
+
+  fseek(fp, 0, SEEK_END);
+  off_t size = ftell(fp); // long int, get file size
   printf("filename: %s, size: %ld\n", filename, size);
 
-  off_t offset = 0;
+  fseek(fp, 0, SEEK_SET);
+  size_t numbytes = fread(buf, 1, MAXBUFLEN, fp);
+
+  return numbytes;
 }
 
-void rrq_handler(char *filename) {
+// copy struct to buffer, handle endian issue
+int data_to_buffer(char *buf_send, tftp_data_t data_packet) {
+  off_t offset = 0;
+  uint16_t big_endian = (data_packet.opcode >> 8) | (data_packet.opcode << 8);
+  memcpy(buf_send, &(big_endian), sizeof(big_endian));
+  offset += sizeof(data_packet.opcode);
+
+  big_endian = (data_packet.block_num >> 8) | (data_packet.block_num << 8);
+  memcpy(buf_send + offset, &(big_endian), sizeof(big_endian));
+  offset += sizeof(data_packet.block_num);
+
+  memcpy(buf_send + offset, data_packet.payload, sizeof(data_packet.payload));
+  return 0;
+}
+void rrq_handler(char *filename, const struct sockaddr *client_addr) {
   char buf_send[516] = {0};
   bool next_block = 1;
-  
+  int numbytes = 0;
+  int sockfd = init("");
+  if (access(filename, F_OK) == -1) { // file doesn't exist
+    printf("file %s doesn't exist.\n", filename);
+    return; // early return
+  }
+  // create new socket with ephemeral port
+
   tftp_data_t data_packet = {0};
-  data_packet.opcode = 1;
-  data_packet.block = 0;
-  read_block(filename, data_packet.payload);
-//   memset(data_packet.payload, 20, 512);
-  memcpy(buf_send, &data_packet, sizeof(tftp_data_t));
-  // print_hex(buf_send, sizeof(tftp_data_t));
+  data_packet.opcode = DATA;
+  data_packet.block_num = 1;
+  numbytes = read_block(filename, data_packet.payload);
+  printf("numbytes read: %d\n", numbytes);
+
+  data_to_buffer(buf_send, data_packet);
+  print_hex(buf_send, 4);
+  sendto(sockfd, buf_send, sizeof(buf_send), 0, client_addr,
+         sizeof(*client_addr));
 }
 
 opcode_t parse_header(char buf[MAXBUFLEN], char filename[MAXBUFLEN],

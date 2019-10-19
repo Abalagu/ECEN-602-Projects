@@ -45,6 +45,17 @@ int main(int argc, char* argv[]) {
 
 	/* parse the received header */
 	opcode = parse_header(buf, filename, mode);
+	if(!fork()){
+		printf("I'm the child!\n");
+		sleep(3);
+		printf("child returns.\n");
+	} else{
+		printf("I'm the parent!\n");
+		wait(NULL);
+		while(1){ // loop to maintain parent process
+
+		}
+	}
 
 	switch (opcode) {
 	case RRQ: 

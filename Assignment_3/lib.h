@@ -18,6 +18,13 @@ typedef struct
 	char trail_buf[MAXBUFLEN];
 }tftp_header_t;
 
+
+typedef struct {
+	uint16_t opcode;
+	uint16_t block;
+	char payload[512];
+} tftp_data_t;
+
 /* IPv4 or IPv6 */
 void *get_in_addr(struct sockaddr *);
 
@@ -26,5 +33,8 @@ int init(char *port);
 
 /* header parser*/
 opcode_t parse_header(char buf[MAXBUFLEN], char filename[MAXBUFLEN], char mode[8]);
+
+#define DATA_PACKET_LEN 516; // opcode + #block + payload = 2 + 2 + 512 = 516
+void rrq_handler(char *filename);
 
 #endif

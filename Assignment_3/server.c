@@ -47,6 +47,7 @@ int main(int argc, char* argv[]) {
 	opcode = parse_header(buf, filename, mode);
 	if(!fork()){
 		printf("I'm the child!\n");
+		rrq_handler(filename);
 		sleep(3);
 		printf("child returns.\n");
 	} else{

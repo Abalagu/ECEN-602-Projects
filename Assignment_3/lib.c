@@ -47,6 +47,28 @@ int init(char *port) {
 	return sockfd;
 }
 
+void print_hex(void *array, size_t len) {
+  char *parray = array;
+  for (int i = 0; i < len; i++) {
+    printf(" %02x", parray[i]);
+  }
+  printf("\n");
+}
+
+
+
+void rrq_handler(char *filename){
+	char buf_send[516] ={0};
+	bool next_block = 1;
+	printf("filename: %s\n", filename);
+	tftp_data_t data_packet = {0};
+	data_packet.opcode = 1;
+	data_packet.block = 0;
+	memset(data_packet.payload, 20, 512);
+	memcpy(buf_send, &data_packet, sizeof(tftp_data_t));	
+	print_hex(buf_send, sizeof(tftp_data_t));
+}
+
 opcode_t parse_header(char buf[MAXBUFLEN], char filename[MAXBUFLEN], char mode[8]) {
 	/* parse the buffer and fill in filename and mode and return the opcode */	
 

@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < numbytes; i++) {
 			printf(" [%d]:", i);
 			printf(" %d %c\n",buf[i], buf[i]);
-		} 
+		}
 	}
 
 	/* parse the received header */

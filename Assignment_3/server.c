@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
 	char *port;
 	port = argv[1];
 
-	char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN];
+	char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN] = {0};
 	int sockfd, numbytes;
 	char mode[8]; // netascii, octet or mail, should never exceed 8 bytes
 
@@ -48,7 +48,6 @@ int main(int argc, char* argv[]) {
 	if(!fork()){
 		printf("I'm the child!\n");
 		rrq_handler(filename);
-		sleep(3);
 		printf("child returns.\n");
 	} else{
 		printf("I'm the parent!\n");

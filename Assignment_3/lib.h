@@ -35,6 +35,6 @@ int init(char *port);
 opcode_t parse_header(char buf[MAXBUFLEN], char filename[MAXBUFLEN], char mode[8]);
 
 #define DATA_PACKET_LEN 516; // opcode + #block + payload = 2 + 2 + 512 = 516
-void rrq_handler(char *filename);
+int read_block(char *filename, char *buf);
 
 #endif

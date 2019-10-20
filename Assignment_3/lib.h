@@ -13,7 +13,7 @@ typedef enum opcode_t {
 } opcode_t;
 
 // status code of lib function return value
-typedef enum { TFTP_OK = 0, TFTP_FAIL = -1 } tftp_err_t;
+typedef enum tftp_err_t { TFTP_OK = 0, TFTP_FAIL = -1 } tftp_err_t;
 
 // error code of ERROR packet
 // when return from function, use negative number of corresponding enum
@@ -49,13 +49,18 @@ typedef struct tftp_error_packet_t {
   uint8_t trailing_zero; // empty byte from the spec
 } tftp_error_packet_t;
 
+typedef struct tftp_ack_packet_t {
+  uint16_t opcode;
+  uint16_t block_num;
+} tftp_ack_packet_t;
+
 /* initialize server */
 tftp_err_t init(char *port, int *sockfd);
 
 // parent function. listen on well known port.
 // return buf, numbytes, and remote address
-tftp_err_t tftp_recvfrom(int listen_fd, char *buf, int *numbytes,
-                         struct sockaddr_storage *their_addr);
+tftp_err_t tftp_recvfrom(int sockfd, char *buf, int *numbytes,
+                         struct sockaddr *their_addr);
 
 // given buffer and numbytes, return opcode from its header
 tftp_err_t parse_header(char *buf, size_t numbytes, opcode_t *opcode);
@@ -66,6 +71,6 @@ tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
 
 // handler function when RRQ packet is received in the parent process
 void rrq_handler(char *filename, tftp_mode_t mode,
-                 const struct sockaddr *client_addr);
+                 struct sockaddr *client_addr);
 
 #endif

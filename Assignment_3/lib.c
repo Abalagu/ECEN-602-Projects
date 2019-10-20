@@ -100,9 +100,25 @@ void get_peer_info(int sockfd, struct sockaddr_storage addr) {
     inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
   }
 
-  printf("Peer IP address: %s\n", ipstr);
-  printf("Peer port      : %d\n", port);
+  if (DEBUG) {
+    printf("Peer IP address: %s\n", ipstr);
+    printf("Peer port      : %d\n", port);
+  }
 }
+
+tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
+                             char *buf_send) {
+  //  given error code and error message, write to buffer
+  tftp_error_packet_t error_packet = {0};
+  error_packet.opcode = ERROR;
+  error_packet.error_code = error_code;
+  strcpy(error_packet.error_msg, error_msg);
+  error_to_buffer(buf_send, error_packet);
+
+  return TFTP_OK;
+}
+
+tftp_err_t parse_ack_packet() {}
 // ------- END OF INNER UTIL FUNCTIONS ------------
 
 tftp_err_t init(char *port, int *sockfd) {
@@ -145,18 +161,18 @@ tftp_err_t init(char *port, int *sockfd) {
   return TFTP_OK;
 }
 
-tftp_err_t tftp_recvfrom(int listen_fd, char *buf, int *numbytes,
-                         struct sockaddr_storage *their_addr) {
-  char s[INET6_ADDRSTRLEN] = {0};
+tftp_err_t tftp_recvfrom(int sockfd, char *buf, int *numbytes,
+                         struct sockaddr *their_addr) {
+  // char s[INET6_ADDRSTRLEN] = {0};
   socklen_t addr_len = sizeof their_addr;
 
   printf("server: waiting to recvfrom \n");
-  if ((*numbytes = recvfrom(listen_fd, buf, MAXBUFLEN - 1, 0,
-                            (struct sockaddr *)their_addr, &addr_len)) == -1) {
+  if ((*numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1, 0, their_addr,
+                            &addr_len)) == -1) {
     perror("recvform");
     return TFTP_FAIL;
   }
-  get_peer_info(listen_fd, *their_addr);
+  get_peer_info(sockfd, *(struct sockaddr_storage *)their_addr);
 
   return TFTP_OK;
 }
@@ -196,21 +212,11 @@ tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
   return TFTP_OK;
 }
 
-tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
-                             char *buf_send) {
-  //  given error code and error message, write to buffer
-  tftp_error_packet_t error_packet = {0};
-  error_packet.opcode = ERROR;
-  error_packet.error_code = error_code;
-  strcpy(error_packet.error_msg, error_msg);
-  error_to_buffer(buf_send, error_packet);
-
-  return TFTP_OK;
-}
-
 void rrq_handler(char *filename, tftp_mode_t mode,
-                 const struct sockaddr *client_addr) {
+                 struct sockaddr *client_addr) {
   char buf_send[516] = {0};
+  char buf_recv[516] = {0};
+
   bool next_block = 1;
   int numbytes = 0;
   int sockfd;
@@ -237,4 +243,5 @@ void rrq_handler(char *filename, tftp_mode_t mode,
   print_hex(buf_send, 4);
   sendto(sockfd, buf_send, sizeof(buf_send), 0, client_addr,
          sizeof(*client_addr));
+  tftp_recvfrom(sockfd, buf_recv, &numbytes, client_addr);
 }

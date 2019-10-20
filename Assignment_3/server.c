@@ -6,20 +6,22 @@ tftp_err_t main(int argc, char *argv[]) {
     printf("usage: ./server port\n");
     return 1;
   }
-
+  // TODO: add port param check
   char *port;
   port = argv[1];
 
   char buf_recv[MAXBUFLEN];
   int listen_fd;
   size_t numbytes;
-
   opcode_t opcode;
-  // struct sockaddr_storage their_addr;
   struct sockaddr client_addr;
 
   /* initialize the server */
-  init(port, &listen_fd);
+  if (init(port, &listen_fd) == TFTP_FAIL) {
+    printf("INIT FAILED.\n");
+    return TFTP_FAIL;
+  }
+
   while (1) {
     tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr);
     if (!fork()) {
@@ -28,6 +30,10 @@ tftp_err_t main(int argc, char *argv[]) {
       parse_header(buf_recv, numbytes, &opcode);
       if (opcode == RRQ) {
         rrq_handler(buf_recv, numbytes, client_addr);
+      }
+      if (opcode == WRQ) {
+        // TODO: add WRQ handling
+        printf("WRQ not handled.\n");
       }
       exit(0);
     } else {

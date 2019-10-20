@@ -22,6 +22,7 @@
 #define DEBUG 0
 
 #define MAXBUFLEN 512 
-
+#define MAX_FILE_NAME 255
+#define DATA_PACKET_LEN 516; // opcode + #block + payload = 2 + 2 + 512 = 516
 
 #endif

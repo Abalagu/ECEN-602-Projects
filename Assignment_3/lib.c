@@ -124,9 +124,10 @@ tftp_err_t parse_ack_packet(char *buf_recv, int block_num) {
   tftp_ack_packet_t *ack_packet = (tftp_ack_packet_t *)buf_recv;
   // TODO: consider block num wrap around
   if (ack_packet->block_num >> 8 == block_num) {
-    printf("block num: %d\n", ack_packet->block_num >> 8);
+    printf("ACK on block: %d\n", ack_packet->block_num >> 8);
     return TFTP_OK;
   } else {
+    printf("WRONG BLOCK NUM: %d\n", ack_packet->block_num >> 8);
     return TFTP_FAIL;
   }
 }
@@ -228,7 +229,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   char buf_send[516] = {0}, buf_recv[516] = {0}, error_msg[128] = {0},
        filename[MAX_FILE_NAME] = {0};
 
-  bool next_block = 1;
+  bool is_EOF = 0; // if is last data block, send 1 less byte
   // local block num counter, pass to file read, verify on ACK
   int block_num = 1, sockfd;
   tftp_mode_t mode;
@@ -251,9 +252,13 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   data_packet.block_num = block_num;
   numbytes = read_block(filename, data_packet.payload);
 
+  if (numbytes < MAXBUFLEN) { // read less than 512 bytes of data, reached EOF
+    is_EOF = 1;
+  }
+
   data_to_buffer(buf_send, data_packet);
 
-  sendto(sockfd, buf_send, sizeof(buf_send), 0, &client_addr,
+  sendto(sockfd, buf_send, sizeof(buf_send) - is_EOF, 0, &client_addr,
          sizeof(client_addr));
   tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
   parse_header(buf_recv, numbytes, &opcode);
@@ -263,10 +268,9 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   }
   if (opcode == ACK) {
     if (parse_ack_packet(buf_recv, block_num) == TFTP_OK) {
-      printf("ACK on block: %d\n", block_num);
       block_num += 1;
     } else {
-      printf("ACK PARSE FAIL\n");
+      printf("ACK PARSE FAIL.\n");
     };
   } else {
     printf("UNKNOWN PACKET\n");

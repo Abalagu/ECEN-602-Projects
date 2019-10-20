@@ -29,7 +29,9 @@ tftp_err_t main(int argc, char *argv[]) {
 
       parse_header(buf_recv, numbytes, &opcode);
       if (opcode == RRQ) {
-        if (rrq_handler(buf_recv, numbytes, client_addr) != TFTP_OK) {
+        if (rrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
+          printf("EXIT ON OK.\n");
+        } else {
           printf("EXIT ON ERROR.\n");
         }
       }

@@ -60,11 +60,11 @@ tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
   return TFTP_OK;
 }
 
-int read_block(FILE *fp, char *buf) {
-  printf("read block\n");
-  // size_t numbytes = fread(buf, 1, MAXBUFLEN, fp);
-  size_t numbytes = 2;
-  printf("read block: %ld\n", numbytes);
+// given block_num, read file to buffer
+int read_block(FILE **fp, int block_num, char *buf) {
+  // fseek(*fp, 0, SEEK_SET);
+  size_t numbytes = fread(buf, 1, MAXBUFLEN, *fp);
+  printf("#block: %d, size: %ld\n", block_num, numbytes);
   return numbytes;
 }
 
@@ -112,11 +112,7 @@ tftp_err_t make_data_packet(FILE **fp, int block_num, char *buf_send,
   tftp_data_packet_t data_packet = {0};
   data_packet.opcode = DATA;
   data_packet.block_num = block_num;
-  printf("before seek\n");
-  // fseek(fp, 0, SEEK_SET);
-  printf("before fread\n");
-  *numbytes = fread(data_packet.payload, 1, MAXBUFLEN, *fp);
-  printf("after fread\n");
+  *numbytes = read_block(fp, block_num, data_packet.payload);
   data_to_buffer(buf_send, data_packet);
 
   return TFTP_OK;
@@ -266,35 +262,40 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
 
   if (open_file(&fp, filename) != TFTP_OK) {
     printf("OPEN FILE FAIL!.\n");
+    // TODO: reply with error packet.
     return TFTP_FAIL;
   };
 
-  make_data_packet(&fp, block_num, buf_send, &numbytes);
-  if (numbytes < MAXBUFLEN) { // read less than 512 bytes of data, reached EOF
-    is_EOF = 1;
-    printf("Reached EOF.\n");
-  }
+  while (1) {
+    make_data_packet(&fp, block_num, buf_send, &numbytes);
+    if (numbytes < MAXBUFLEN) { // read less than 512 bytes of data, reached EOF
+      is_EOF = 1;
+      printf("Reached EOF.\n");
+    }
 
-  sendto(sockfd, buf_send, sizeof(buf_send) - is_EOF, 0, &client_addr,
-         sizeof(client_addr));
+    sendto(sockfd, buf_send, 4 + numbytes, 0, &client_addr,
+           sizeof(client_addr));
 
-  tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
-  parse_header(buf_recv, numbytes, &opcode);
-  if (opcode == ERROR) {
-    printf("ERROR PACKET\n");
-    return TFTP_FAIL;
-  }
-  if (opcode == ACK) {
-    if (parse_ack_packet(buf_recv, block_num) == TFTP_OK) {
-      block_num += 1;
-    } else {
-      printf("ACK PARSE FAIL.\n");
-    };
-  } else {
-    printf("UNKNOWN PACKET\n");
-  }
-
-  // take no action on other packets, make disconnect decision from timeout
-  close(sockfd); // tftp sends get to well-known port each time.
-  printf("RRQ HANDLER ENDS\n");
-}
+    tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
+    parse_header(buf_recv, numbytes, &opcode);
+    if (opcode != ERROR && opcode != ACK) { // deal with trivial error case
+      // take no action on other packets, make disconnect decision from timeout
+      printf("UNKNOWN PACKET\n");
+    }
+    if (opcode == ERROR) {
+      printf("ERROR PACKET\n");
+      return TFTP_FAIL; // end of routine on FAIL
+    }
+    if (opcode == ACK) {
+      if (parse_ack_packet(buf_recv, block_num) == TFTP_OK) {
+        block_num += 1;
+        if (is_EOF) {     // received final ACK
+          close(sockfd);  // tftp sends get to well-known port each time.
+          return TFTP_OK; // end of routine on success
+        }
+      } else { // wrong block number
+        printf("WRONG #BLOCK.\n");
+      }
+    }
+  } // end of while loop
+} // end of rrq handler routine

@@ -271,5 +271,8 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   } else {
     printf("UNKNOWN PACKET\n");
   }
+
   // take no action on other packets, make disconnect decision from timeout
+  close(sockfd); // tftp sends get to well-known port each time.
+  printf("RRQ HANDLER ENDS\n");
 }

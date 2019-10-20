@@ -29,8 +29,24 @@ void print_hex(void *array, size_t len) {
   }
   printf("\n");
 }
+
+tftp_err_t error_to_buffer(char *buf_send, tftp_error_packet_t error_packet) {
+  off_t offset = 0;
+  uint16_t big_endian = (error_packet.opcode >> 8) | (error_packet.opcode << 8);
+  memcpy(buf_send, &(big_endian), sizeof(big_endian));
+  offset += sizeof(error_packet.opcode);
+
+  big_endian = (error_packet.error_code >> 8) | (error_packet.error_code << 8);
+  memcpy(buf_send + offset, &(big_endian), sizeof(big_endian));
+  offset += sizeof(error_packet.error_code);
+
+  memcpy(buf_send + offset, error_packet.error_msg,
+         sizeof(error_packet.error_msg));
+  return TFTP_OK;
+}
+
 // copy struct to buffer, handle endian issue
-int data_to_buffer(char *buf_send, tftp_data_t data_packet) {
+tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
   off_t offset = 0;
   uint16_t big_endian = (data_packet.opcode >> 8) | (data_packet.opcode << 8);
   memcpy(buf_send, &(big_endian), sizeof(big_endian));
@@ -41,7 +57,7 @@ int data_to_buffer(char *buf_send, tftp_data_t data_packet) {
   offset += sizeof(data_packet.block_num);
 
   memcpy(buf_send + offset, data_packet.payload, sizeof(data_packet.payload));
-  return 0;
+  return TFTP_OK;
 }
 
 int read_block(char *filename, char *buf) {
@@ -180,20 +196,38 @@ tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
   return TFTP_OK;
 }
 
+tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
+                             char *buf_send) {
+  //  given error code and error message, write to buffer
+  tftp_error_packet_t error_packet = {0};
+  error_packet.opcode = ERROR;
+  error_packet.error_code = error_code;
+  strcpy(error_packet.error_msg, error_msg);
+  error_to_buffer(buf_send, error_packet);
+
+  return TFTP_OK;
+}
+
 void rrq_handler(char *filename, tftp_mode_t mode,
                  const struct sockaddr *client_addr) {
   char buf_send[516] = {0};
   bool next_block = 1;
   int numbytes = 0;
   int sockfd;
-  init("", &sockfd);
+  char error_msg[128] = {0};
+
+  init("", &sockfd);                  // create with an ephemeral port
   if (access(filename, F_OK) == -1) { // file doesn't exist
-    printf("file %s doesn't exist.\n", filename);
+    sprintf(error_msg, "file '%s' not found.", filename);
+    printf("%s\n", error_msg);
+    make_error_packet(FILE_NOT_FOUND, error_msg, buf_send);
+    sendto(sockfd, buf_send, sizeof(buf_send), 0, client_addr,
+           sizeof(*client_addr));
     return; // early return
   }
   // create new socket with ephemeral port
 
-  tftp_data_t data_packet = {0};
+  tftp_data_packet_t data_packet = {0};
   data_packet.opcode = DATA;
   data_packet.block_num = 1;
   numbytes = read_block(filename, data_packet.payload);

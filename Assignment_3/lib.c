@@ -60,23 +60,11 @@ tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
   return TFTP_OK;
 }
 
-int read_block(char *filename, char *buf) {
-
-  FILE *fp;
-
-  fp = fopen(filename, "r");
-  if (fp == NULL) {
-    printf("file: %s. open failed.\n", filename);
-    return 1;
-  }
-
-  fseek(fp, 0, SEEK_END);
-  off_t size = ftell(fp); // long int, get file size
-  printf("filename: %s, size: %ld\n", filename, size);
-
-  fseek(fp, 0, SEEK_SET);
-  size_t numbytes = fread(buf, 1, MAXBUFLEN, fp);
-
+int read_block(FILE *fp, char *buf) {
+  printf("read block\n");
+  // size_t numbytes = fread(buf, 1, MAXBUFLEN, fp);
+  size_t numbytes = 2;
+  printf("read block: %ld\n", numbytes);
   return numbytes;
 }
 
@@ -114,6 +102,22 @@ tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
   error_packet.error_code = error_code;
   strcpy(error_packet.error_msg, error_msg);
   error_to_buffer(buf_send, error_packet);
+
+  return TFTP_OK;
+}
+
+// read from fp into buf_send, numbytes read returned for EOF decision
+tftp_err_t make_data_packet(FILE **fp, int block_num, char *buf_send,
+                            size_t *numbytes) {
+  tftp_data_packet_t data_packet = {0};
+  data_packet.opcode = DATA;
+  data_packet.block_num = block_num;
+  printf("before seek\n");
+  // fseek(fp, 0, SEEK_SET);
+  printf("before fread\n");
+  *numbytes = fread(data_packet.payload, 1, MAXBUFLEN, *fp);
+  printf("after fread\n");
+  data_to_buffer(buf_send, data_packet);
 
   return TFTP_OK;
 }
@@ -178,7 +182,6 @@ tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
   // char s[INET6_ADDRSTRLEN] = {0};
   socklen_t addr_len = sizeof their_addr;
 
-  printf("server: waiting to recvfrom \n");
   if ((*numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1, 0, their_addr,
                             &addr_len)) == -1) {
     perror("recvform");
@@ -190,7 +193,6 @@ tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
 }
 
 tftp_err_t parse_header(char *buf, size_t numbytes, opcode_t *opcode) {
-  print_hex(buf, 4);
   tftp_header_t *tftp_header = (tftp_header_t *)buf;
   /* extract opcode */
   *opcode = (tftp_header->opcode) >> 8;
@@ -223,6 +225,20 @@ tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
   return TFTP_OK;
 }
 
+// given file name, open file, prints file size.
+tftp_err_t open_file(FILE **fp, char *filename) {
+  *fp = fopen(filename, "r");
+  if (*fp == NULL) {
+    printf("file: %s. open failed.\n", filename);
+    return TFTP_FAIL;
+  }
+
+  fseek(*fp, 0, SEEK_END);
+  off_t size = ftell(*fp); // long int, get file size
+  printf("filename: %s, size: %ld\n", filename, size);
+  fseek(*fp, 0, SEEK_SET);
+  return TFTP_OK;
+}
 // given RRQ buffer, its length, and remote address, enter handling routine
 tftp_err_t rrq_handler(char *buf, size_t numbytes,
                        struct sockaddr client_addr) {
@@ -234,6 +250,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   int block_num = 1, sockfd;
   tftp_mode_t mode;
   opcode_t opcode;
+  FILE *fp;
 
   parse_rrq(buf, numbytes, filename, &mode);
 
@@ -247,19 +264,20 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
     return TFTP_FAIL; // early return
   }
 
-  tftp_data_packet_t data_packet = {0};
-  data_packet.opcode = DATA;
-  data_packet.block_num = block_num;
-  numbytes = read_block(filename, data_packet.payload);
+  if (open_file(&fp, filename) != TFTP_OK) {
+    printf("OPEN FILE FAIL!.\n");
+    return TFTP_FAIL;
+  };
 
+  make_data_packet(&fp, block_num, buf_send, &numbytes);
   if (numbytes < MAXBUFLEN) { // read less than 512 bytes of data, reached EOF
     is_EOF = 1;
+    printf("Reached EOF.\n");
   }
-
-  data_to_buffer(buf_send, data_packet);
 
   sendto(sockfd, buf_send, sizeof(buf_send) - is_EOF, 0, &client_addr,
          sizeof(client_addr));
+
   tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
   parse_header(buf_recv, numbytes, &opcode);
   if (opcode == ERROR) {

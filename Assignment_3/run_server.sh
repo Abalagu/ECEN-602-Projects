@@ -1,8 +1,9 @@
 clear
 make clean
 make
-if [ $? -eq 0 ]
-then
-    clear
-    ./server 4950
-fi
+./server 4950
+# if [ $? -eq 0 ]
+# then
+#     clear
+#     ./server 4950
+# fi

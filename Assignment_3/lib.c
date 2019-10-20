@@ -118,7 +118,18 @@ tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
   return TFTP_OK;
 }
 
-tftp_err_t parse_ack_packet() {}
+tftp_err_t parse_ack_packet(char *buf_recv, int block_num) {
+  // opcode is verified in the packet router
+  // compare if ack to the same block_num counter
+  tftp_ack_packet_t *ack_packet = (tftp_ack_packet_t *)buf_recv;
+  // TODO: consider block num wrap around
+  if (ack_packet->block_num >> 8 == block_num) {
+    printf("block num: %d\n", ack_packet->block_num >> 8);
+    return TFTP_OK;
+  } else {
+    return TFTP_FAIL;
+  }
+}
 // ------- END OF INNER UTIL FUNCTIONS ------------
 
 tftp_err_t init(char *port, int *sockfd) {
@@ -161,7 +172,7 @@ tftp_err_t init(char *port, int *sockfd) {
   return TFTP_OK;
 }
 
-tftp_err_t tftp_recvfrom(int sockfd, char *buf, int *numbytes,
+tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
                          struct sockaddr *their_addr) {
   // char s[INET6_ADDRSTRLEN] = {0};
   socklen_t addr_len = sizeof their_addr;
@@ -198,7 +209,6 @@ tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
 
   if (pos < 0) {
     perror("filename not valid\n");
-    // TODO:: send an error.
     return TFTP_FAIL;
   }
 
@@ -212,36 +222,54 @@ tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
   return TFTP_OK;
 }
 
-void rrq_handler(char *filename, tftp_mode_t mode,
-                 struct sockaddr *client_addr) {
-  char buf_send[516] = {0};
-  char buf_recv[516] = {0};
+// given RRQ buffer, its length, and remote address, enter handling routine
+tftp_err_t rrq_handler(char *buf, size_t numbytes,
+                       struct sockaddr client_addr) {
+  char buf_send[516] = {0}, buf_recv[516] = {0}, error_msg[128] = {0},
+       filename[MAX_FILE_NAME] = {0};
 
   bool next_block = 1;
-  int numbytes = 0;
-  int sockfd;
-  char error_msg[128] = {0};
+  // local block num counter, pass to file read, verify on ACK
+  int block_num = 1, sockfd;
+  tftp_mode_t mode;
+  opcode_t opcode;
+
+  parse_rrq(buf, numbytes, filename, &mode);
 
   init("", &sockfd);                  // create with an ephemeral port
   if (access(filename, F_OK) == -1) { // file doesn't exist
     sprintf(error_msg, "file '%s' not found.", filename);
     printf("%s\n", error_msg);
     make_error_packet(FILE_NOT_FOUND, error_msg, buf_send);
-    sendto(sockfd, buf_send, sizeof(buf_send), 0, client_addr,
-           sizeof(*client_addr));
-    return; // early return
+    sendto(sockfd, buf_send, sizeof(buf_send), 0, &client_addr,
+           sizeof(client_addr));
+    return TFTP_FAIL; // early return
   }
-  // create new socket with ephemeral port
 
   tftp_data_packet_t data_packet = {0};
   data_packet.opcode = DATA;
-  data_packet.block_num = 1;
+  data_packet.block_num = block_num;
   numbytes = read_block(filename, data_packet.payload);
-  printf("numbytes read: %d\n", numbytes);
 
   data_to_buffer(buf_send, data_packet);
-  print_hex(buf_send, 4);
-  sendto(sockfd, buf_send, sizeof(buf_send), 0, client_addr,
-         sizeof(*client_addr));
-  tftp_recvfrom(sockfd, buf_recv, &numbytes, client_addr);
+
+  sendto(sockfd, buf_send, sizeof(buf_send), 0, &client_addr,
+         sizeof(client_addr));
+  tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
+  parse_header(buf_recv, numbytes, &opcode);
+  if (opcode == ERROR) {
+    printf("ERROR PACKET\n");
+    return TFTP_FAIL;
+  }
+  if (opcode == ACK) {
+    if (parse_ack_packet(buf_recv, block_num) == TFTP_OK) {
+      printf("ACK on block: %d\n", block_num);
+      block_num += 1;
+    } else {
+      printf("ACK PARSE FAIL\n");
+    };
+  } else {
+    printf("UNKNOWN PACKET\n");
+  }
+  // take no action on other packets, make disconnect decision from timeout
 }

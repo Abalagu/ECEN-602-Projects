@@ -10,9 +10,10 @@ tftp_err_t main(int argc, char *argv[]) {
   char *port;
   port = argv[1];
 
-  char buf[MAXBUFLEN], filename[MAX_FILE_NAME] = {0};
-  int listen_fd, numbytes;
-  tftp_mode_t mode;
+  char buf_recv[MAXBUFLEN];
+  int listen_fd;
+  size_t numbytes;
+  
   opcode_t opcode;
   // struct sockaddr_storage their_addr;
   struct sockaddr client_addr;
@@ -20,15 +21,13 @@ tftp_err_t main(int argc, char *argv[]) {
   /* initialize the server */
   init(port, &listen_fd);
 
-  tftp_recvfrom(listen_fd, buf, &numbytes, &client_addr);
+  tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr);
   if (!fork()) {
     close(listen_fd); // close listening socket in child process
 
-    parse_header(buf, numbytes, &opcode);
+    parse_header(buf_recv, numbytes, &opcode);
     if (opcode == RRQ) {
-      parse_rrq(buf, numbytes, filename, &mode);
-
-      rrq_handler(filename, mode, &client_addr);
+      rrq_handler(buf_recv, numbytes, client_addr);
     }
 
     printf("child returns.\n");

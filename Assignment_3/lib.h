@@ -54,10 +54,10 @@ typedef struct tftp_ack_packet_t {
   uint16_t block_num;
 } tftp_ack_packet_t;
 
-/* initialize server */
+// launch DGRAM socket at given port. 
+// port = "" results in ephemeral port.
 tftp_err_t init(char *port, int *sockfd);
 
-// parent function. listen on well known port.
 // return buf, numbytes, and remote address
 tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
                          struct sockaddr *their_addr);

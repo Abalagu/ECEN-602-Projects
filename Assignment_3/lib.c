@@ -30,36 +30,6 @@ void print_hex(void *array, size_t len) {
   printf("\n");
 }
 
-tftp_err_t error_to_buffer(char *buf_send, tftp_error_packet_t error_packet) {
-  off_t offset = 0;
-  uint16_t big_endian = bswap_16(error_packet.opcode);
-  memcpy(buf_send, &big_endian, sizeof(big_endian));
-  offset += sizeof(error_packet.opcode);
-
-  big_endian = bswap_16(error_packet.error_code);
-  memcpy(buf_send + offset, &big_endian, sizeof(big_endian));
-  offset += sizeof(error_packet.error_code);
-
-  memcpy(buf_send + offset, error_packet.error_msg,
-         sizeof(error_packet.error_msg));
-  return TFTP_OK;
-}
-
-// copy struct to buffer, handle endian issue
-tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
-  off_t offset = 0;
-  uint16_t big_endian = bswap_16(data_packet.opcode);
-  memcpy(buf_send, &big_endian, sizeof(big_endian));
-  offset += sizeof(data_packet.opcode);
-
-  big_endian = bswap_16(data_packet.block_num);
-  memcpy(buf_send + offset, &big_endian, sizeof(big_endian));
-  offset += sizeof(data_packet.block_num);
-
-  memcpy(buf_send + offset, data_packet.payload, sizeof(data_packet.payload));
-  return TFTP_OK;
-}
-
 // given block_num, read file to buffer
 int read_block(FILE **fp, uint16_t block_num, char *buf) {
   size_t numbytes = fread(buf, 1, MAXBUFLEN, *fp);
@@ -68,6 +38,7 @@ int read_block(FILE **fp, uint16_t block_num, char *buf) {
   return numbytes;
 }
 
+// get connected peer (remote) IP address port number
 void get_peer_info(int sockfd, struct sockaddr_storage addr) {
   // assume s is a connected socket
 
@@ -94,15 +65,47 @@ void get_peer_info(int sockfd, struct sockaddr_storage addr) {
   }
 }
 
+// copy error packet to buffer, handle endian issue
+tftp_err_t error_to_buffer(char *buf_send, tftp_error_packet_t error_packet) {
+  off_t offset = 0;
+  uint16_t big_endian = bswap_16(error_packet.opcode);
+  memcpy(buf_send, &big_endian, sizeof(big_endian));
+  offset += sizeof(error_packet.opcode);
+
+  big_endian = bswap_16(error_packet.error_code);
+  memcpy(buf_send + offset, &big_endian, sizeof(big_endian));
+  offset += sizeof(error_packet.error_code);
+
+  memcpy(buf_send + offset, error_packet.error_msg,
+         sizeof(error_packet.error_msg));
+  return TFTP_OK;
+}
+
+//  given error code and error message, write to buffer
+// TODO: add other possible error code logic
 tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
                              char *buf_send) {
-  //  given error code and error message, write to buffer
   tftp_error_packet_t error_packet = {0};
   error_packet.opcode = ERROR;
   error_packet.error_code = error_code;
   strcpy(error_packet.error_msg, error_msg);
   error_to_buffer(buf_send, error_packet);
 
+  return TFTP_OK;
+}
+
+// copy struct to buffer, handle endian issue
+tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
+  off_t offset = 0;
+  uint16_t big_endian = bswap_16(data_packet.opcode);
+  memcpy(buf_send, &big_endian, sizeof(big_endian));
+  offset += sizeof(data_packet.opcode);
+
+  big_endian = bswap_16(data_packet.block_num);
+  memcpy(buf_send + offset, &big_endian, sizeof(big_endian));
+  offset += sizeof(data_packet.block_num);
+
+  memcpy(buf_send + offset, data_packet.payload, sizeof(data_packet.payload));
   return TFTP_OK;
 }
 
@@ -117,10 +120,9 @@ tftp_err_t make_data_packet(FILE **fp, uint16_t block_num, char *buf_send,
 
   return TFTP_OK;
 }
-
+// opcode is verified in the packet router
+// compare if ack to the same block_num counter
 tftp_err_t parse_ack_packet(char *buf_recv, uint16_t block_num) {
-  // opcode is verified in the packet router
-  // compare if ack to the same block_num counter
   tftp_ack_packet_t *ack_packet = (tftp_ack_packet_t *)buf_recv;
 
   if (bswap_16(ack_packet->block_num) == block_num) {
@@ -178,6 +180,7 @@ tftp_err_t open_file(FILE **fp, char *filename) {
 
 // ------- END OF INNER UTIL FUNCTIONS ------------
 
+// launch DGRAM socket at given port. port = "" results in ephemeral port.
 tftp_err_t init(char *port, int *sockfd) {
   int rv, numbytes;
   struct addrinfo hints, *servinfo, *p;

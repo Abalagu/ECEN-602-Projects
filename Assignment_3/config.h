@@ -18,10 +18,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <byteswap.h>
 
 #define DEBUG 0
 
 #define MAXBUFLEN 512 
-
-
+#define MAX_FILE_NAME 255
+#define DATA_PACKET_LEN 516 // opcode + #block + payload = 2 + 2 + 512 = 516
+#define TIMEOUT 1 // 1 second timeout on select
+#define MAX_RETRY 10
 #endif

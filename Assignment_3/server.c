@@ -1,84 +1,51 @@
 #include "config.h"
 #include "lib.h"
 
-int main(int argc, char *argv[]) {
+tftp_err_t main(int argc, char *argv[]) {
   if (argc != 2) {
     printf("usage: ./server port\n");
     return 1;
   }
+  // TODO: add port param check
   char *port;
   port = argv[1];
 
-  char s[INET6_ADDRSTRLEN], buf[MAXBUFLEN], filename[MAXBUFLEN] = {0};
-  int sockfd, numbytes;
-  char mode[8]; // netascii, octet or mail, should never exceed 8 bytes
-
+  char buf_recv[MAXBUFLEN];
+  int listen_fd;
+  size_t numbytes;
   opcode_t opcode;
-
-  socklen_t addr_len;
-  struct sockaddr_storage their_addr;
-  addr_len = sizeof their_addr;
+  struct sockaddr client_addr;
 
   /* initialize the server */
-  sockfd = init(port);
-  printf("server: waiting to recvfrom \n");
-
-  if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1, 0,
-                           (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-    perror("recvform");
-    exit(1);
+  if (init(port, &listen_fd) == TFTP_FAIL) {
+    printf("INIT FAILED.\n");
+    return TFTP_FAIL;
   }
 
-  printf("server: got packet from %s \n",
-         inet_ntop(their_addr.ss_family,
-                   get_in_addr((struct sockaddr *)&their_addr), s, sizeof s));
+  while (1) {
+    tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr);
+    if (!fork()) {
+      close(listen_fd); // close listening socket in child process
 
-  // buf[numbytes] = '\0';
-  if (DEBUG) {
-    printf("[Packet size] %d\n", numbytes);
-    printf("[Packet content] : \n");
-    for (int i = 0; i < numbytes; i++) {
-      printf(" [%d]:", i);
-      printf(" %d %c\n", buf[i], buf[i]);
+      parse_header(buf_recv, numbytes, &opcode);
+      if (opcode == RRQ) {
+        if (rrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
+          printf("EXIT ON OK.\n");
+        } else {
+          printf("EXIT ON ERROR.\n");
+        }
+      }
+      if (opcode == WRQ) {
+        // TODO: add WRQ handling
+        printf("WRQ not handled.\n");
+      }
+      exit(0);
+    } else {
+      wait(NULL);
+      printf("parent wait end\n\n");
     }
   }
 
-  /* parse the received header */
-  opcode = parse_header(buf, filename, mode);
-  print_hex(buf, numbytes);
-  if (!fork()) {
-	
-    close(sockfd); // close listening socket in child process
-    rrq_handler(filename, (const struct sockaddr *)&their_addr);
-    printf("child returns.\n");
-  } else {
-    wait(NULL);
-    while (1) { // loop to maintain parent process
-    }
-  }
-
-  switch (opcode) {
-  case RRQ:
-    printf("[Read request] \n");
-    break;
-
-  case WRQ:
-    printf("[Write request] \n");
-    break;
-
-  case DATA:
-    break;
-
-  case ACK:
-    break;
-
-  case ERROR:
-    break;
-
-  default:
-    break;
-  }
-
-  close(sockfd);
-  return 0;
+  close(listen_fd);
+  return TFTP_OK;
 }

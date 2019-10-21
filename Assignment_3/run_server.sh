@@ -1,8 +1,6 @@
 # server shell
 
 clear
- # change this file name
-file_name=sample.txt
 
 # create test folder, included in .gitignore
 test_folder=./test
@@ -16,14 +14,13 @@ if [ ! -d "$server_folder" ]; then
     mkdir $server_folder
 fi
 
-test_file=$server_folder/$file_name
-# check test file existence
-if [ ! -f "$test_file" ]; then
-    openssl rand -out $test_file -base64 $((2 ** 30 * 3 / 4))
-    echo "test file $test_file generated."
-else
-    echo "test file $test_file exists."
-fi
+# test case 1: 2048 Bytes
+base64 /dev/urandom | head -c 2K > $server_folder/binary_2048B
+# test case 2: 2047 Bytes
+base64 /dev/urandom | head -c 2047 > $server_folder/binary_2047B
+# test case 4: 34 MB
+base64 /dev/urandom | head -c 34MB > $server_folder/binary_34MB
+echo "test files generated."
 
 make clean
 make

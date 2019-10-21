@@ -32,12 +32,12 @@ void print_hex(void *array, size_t len) {
 
 tftp_err_t error_to_buffer(char *buf_send, tftp_error_packet_t error_packet) {
   off_t offset = 0;
-  uint16_t big_endian = (error_packet.opcode >> 8) | (error_packet.opcode << 8);
-  memcpy(buf_send, &(big_endian), sizeof(big_endian));
+  uint16_t big_endian = bswap_16(error_packet.opcode);
+  memcpy(buf_send, &big_endian, sizeof(big_endian));
   offset += sizeof(error_packet.opcode);
 
-  big_endian = (error_packet.error_code >> 8) | (error_packet.error_code << 8);
-  memcpy(buf_send + offset, &(big_endian), sizeof(big_endian));
+  big_endian = bswap_16(error_packet.error_code);
+  memcpy(buf_send + offset, &big_endian, sizeof(big_endian));
   offset += sizeof(error_packet.error_code);
 
   memcpy(buf_send + offset, error_packet.error_msg,
@@ -48,12 +48,12 @@ tftp_err_t error_to_buffer(char *buf_send, tftp_error_packet_t error_packet) {
 // copy struct to buffer, handle endian issue
 tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
   off_t offset = 0;
-  uint16_t big_endian = (data_packet.opcode >> 8) | (data_packet.opcode << 8);
-  memcpy(buf_send, &(big_endian), sizeof(big_endian));
+  uint16_t big_endian = bswap_16(data_packet.opcode);
+  memcpy(buf_send, &big_endian, sizeof(big_endian));
   offset += sizeof(data_packet.opcode);
 
-  big_endian = (data_packet.block_num >> 8) | (data_packet.block_num << 8);
-  memcpy(buf_send + offset, &(big_endian), sizeof(big_endian));
+  big_endian = bswap_16(data_packet.block_num);
+  memcpy(buf_send + offset, &big_endian, sizeof(big_endian));
   offset += sizeof(data_packet.block_num);
 
   memcpy(buf_send + offset, data_packet.payload, sizeof(data_packet.payload));
@@ -61,10 +61,10 @@ tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
 }
 
 // given block_num, read file to buffer
-int read_block(FILE **fp, int block_num, char *buf) {
-  // fseek(*fp, 0, SEEK_SET);
+int read_block(FILE **fp, uint16_t block_num, char *buf) {
   size_t numbytes = fread(buf, 1, MAXBUFLEN, *fp);
-  printf("#block: %d, size: %ld\n", block_num, numbytes);
+  // TODO: #block print disabled for performance issue
+  // printf("#block: %d, size: %ld\n", block_num, numbytes);
   return numbytes;
 }
 
@@ -107,7 +107,7 @@ tftp_err_t make_error_packet(error_code_t error_code, char *error_msg,
 }
 
 // read from fp into buf_send, numbytes read returned for EOF decision
-tftp_err_t make_data_packet(FILE **fp, int block_num, char *buf_send,
+tftp_err_t make_data_packet(FILE **fp, uint16_t block_num, char *buf_send,
                             size_t *numbytes) {
   tftp_data_packet_t data_packet = {0};
   data_packet.opcode = DATA;
@@ -118,16 +118,19 @@ tftp_err_t make_data_packet(FILE **fp, int block_num, char *buf_send,
   return TFTP_OK;
 }
 
-tftp_err_t parse_ack_packet(char *buf_recv, int block_num) {
+tftp_err_t parse_ack_packet(char *buf_recv, uint16_t block_num) {
   // opcode is verified in the packet router
   // compare if ack to the same block_num counter
   tftp_ack_packet_t *ack_packet = (tftp_ack_packet_t *)buf_recv;
   // TODO: consider block num wrap around
-  if (ack_packet->block_num >> 8 == block_num) {
-    printf("ACK on block: %d\n", ack_packet->block_num >> 8);
+
+  if (bswap_16(ack_packet->block_num) == block_num) {
+    // TODO: ACK print disabled
+    // printf("ACK on block: %d\n", bswap_16(ack_packet->block_num));
     return TFTP_OK;
   } else {
-    printf("WRONG BLOCK NUM: %d\n", ack_packet->block_num >> 8);
+    printf("WRONG BLOCK NUM: %d. Expect: %d\n", bswap_16(ack_packet->block_num),
+           block_num);
     return TFTP_FAIL;
   }
 }
@@ -191,7 +194,7 @@ tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
 tftp_err_t parse_header(char *buf, size_t numbytes, opcode_t *opcode) {
   tftp_header_t *tftp_header = (tftp_header_t *)buf;
   /* extract opcode */
-  *opcode = (tftp_header->opcode) >> 8;
+  *opcode = bswap_16(tftp_header->opcode);
   return TFTP_OK;
 }
 
@@ -243,7 +246,8 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
 
   bool is_EOF = 0; // if is last data block, send 1 less byte
   // local block num counter, pass to file read, verify on ACK
-  int block_num = 1, sockfd;
+  uint16_t block_num = 1; // use uint16_t for natural rollover when overflow
+  int sockfd;
   tftp_mode_t mode;
   opcode_t opcode;
   int timeout_counter = 0;
@@ -283,7 +287,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
 
     sendto(sockfd, buf_send, 4 + numbytes, 0, &client_addr,
            sizeof(client_addr));
-    
+
     tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
     parse_header(buf_recv, numbytes, &opcode);
 

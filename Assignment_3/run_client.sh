@@ -2,10 +2,9 @@
 
 clear
 
-file_name=Makefile
-
+BASEDIR=$PWD
 # create test folder, included in .gitignore
-test_folder=./test
+test_folder=$BASEDIR/test
 if [ ! -d "$test_folder" ]; then
     mkdir $test_folder
 fi
@@ -21,12 +20,32 @@ else
     cd $client_folder
 fi
 
-# test command from tftp
+# test case 1
+file_name=binary_2048B
 tftp localhost 4950 -v -m binary -c get $file_name
-
 # compare files
 cmp $client_folder/$file_name $server_folder/$file_name
 retval=$?
 if [ $retval -eq 0 ]; then
-    echo same file
+    echo "test case 1: $file_name. diff: same file"
+fi
+
+# test case 2
+file_name=binary_2047B
+tftp localhost 4950 -v -m binary -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo "test case 2: $file_name. diff: same file"
+fi
+
+# test case 4
+file_name=binary_34MB
+tftp localhost 4950 -v -m binary -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo "test case 4: $file_name. diff: same file"
 fi

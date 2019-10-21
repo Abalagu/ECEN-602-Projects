@@ -246,12 +246,15 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
 
   bool is_EOF = 0; // if is last data block, send 1 less byte
   // local block num counter, pass to file read, verify on ACK
-  uint16_t block_num = 1; // use uint16_t for natural rollover when overflow
+  // use uint16_t for natural rollover when overflow
+  uint16_t block_num = 1;
   int sockfd;
   tftp_mode_t mode;
   opcode_t opcode;
   int timeout_counter = 0;
   FILE *fp;
+  fd_set readfds;
+  struct timeval tv;
 
   if (parse_rrq(buf, numbytes, filename, &mode) != TFTP_OK) {
     printf("RRQ PARSE ERROR.\n");
@@ -280,14 +283,27 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
 
   while (1) {
     make_data_packet(&fp, block_num, buf_send, &numbytes);
-    if (numbytes < MAXBUFLEN) { // read less than 512 bytes of data, reached EOF
-      is_EOF = 1;
-      printf("Reached EOF.\n");
-    }
+    // if read less than 512 bytes of data, reached EOF
+    is_EOF = (numbytes < MAXBUFLEN);
 
     sendto(sockfd, buf_send, 4 + numbytes, 0, &client_addr,
            sizeof(client_addr));
+    tv.tv_sec = TIMEOUT;
+    tv.tv_usec = 0;
+    FD_ZERO(&readfds);
+    FD_SET(sockfd, &readfds);
+    if (select(sockfd + 1, &readfds, NULL, NULL, &tv) == 0) {
+      timeout_counter += 1;
+      if (timeout_counter == MAX_RETRY) {
+        // disconnect on 10 consecutive timeout
+        close(sockfd);
+        printf("remote disconnected. %d consecutive timeout.\n", MAX_RETRY);
+        return TFTP_FAIL;
+      }
+      continue; // skip below routine, try to resend
+    };
 
+    // select(sockfd,)
     tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
     parse_header(buf_recv, numbytes, &opcode);
 

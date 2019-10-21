@@ -9,3 +9,6 @@
 
 # Ignore IDE config
 .vscode/
+
+# Ignore test folder
+test/

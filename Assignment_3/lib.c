@@ -246,11 +246,19 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   int block_num = 1, sockfd;
   tftp_mode_t mode;
   opcode_t opcode;
+  int timeout_counter = 0;
   FILE *fp;
 
-  parse_rrq(buf, numbytes, filename, &mode);
+  if (parse_rrq(buf, numbytes, filename, &mode) != TFTP_OK) {
+    printf("RRQ PARSE ERROR.\n");
+    return TFTP_FAIL;
+  };
 
-  init("", &sockfd);                  // create with an ephemeral port
+  if (init("", &sockfd) != TFTP_OK) { // create with an ephemeral port
+    printf("INIT FAIL.\n");
+    return TFTP_FAIL;
+  }
+
   if (access(filename, F_OK) == -1) { // file doesn't exist
     sprintf(error_msg, "file '%s' not found.", filename);
     printf("%s\n", error_msg);
@@ -275,9 +283,10 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
 
     sendto(sockfd, buf_send, 4 + numbytes, 0, &client_addr,
            sizeof(client_addr));
-
+    
     tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
     parse_header(buf_recv, numbytes, &opcode);
+
     if (opcode != ERROR && opcode != ACK) { // deal with trivial error case
       // take no action on other packets, make disconnect decision from timeout
       printf("UNKNOWN PACKET\n");

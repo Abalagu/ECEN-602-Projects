@@ -65,9 +65,6 @@ tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
 // given buffer and numbytes, return opcode from its header
 tftp_err_t parse_header(char *buf, size_t numbytes, opcode_t *opcode);
 
-// given buffer and length, return filename and mode
-tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
-                     tftp_mode_t *mode);
 
 // given RRQ buffer, its length, and remote address, enter handling routine
 tftp_err_t rrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr);

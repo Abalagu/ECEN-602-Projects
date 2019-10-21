@@ -122,7 +122,6 @@ tftp_err_t parse_ack_packet(char *buf_recv, uint16_t block_num) {
   // opcode is verified in the packet router
   // compare if ack to the same block_num counter
   tftp_ack_packet_t *ack_packet = (tftp_ack_packet_t *)buf_recv;
-  // TODO: consider block num wrap around
 
   if (bswap_16(ack_packet->block_num) == block_num) {
     // TODO: ACK print disabled
@@ -134,6 +133,49 @@ tftp_err_t parse_ack_packet(char *buf_recv, uint16_t block_num) {
     return TFTP_FAIL;
   }
 }
+
+// given buffer and length, return filename and mode
+tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
+                     tftp_mode_t *mode) {
+  /* trailing buffer now has filename and the mode. According to RFC, the file
+        name is followed by a 0. Locate that 0 */
+  tftp_header_t *tftp_header = (tftp_header_t *)buf;
+  char _mode[9]; // netascii, octet or mail, should never exceed 8 bytes
+
+  char *pos_ptr = strchr(tftp_header->trail_buf, 0);
+  /* in case pos reaches the end of the file, it's a problem */
+  int pos = (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
+
+  if (pos < 0) {
+    perror("filename not valid\n");
+    return TFTP_FAIL;
+  }
+
+  /* extract filename from the trail buffer */
+  memcpy(filename, tftp_header->trail_buf, pos);
+
+  /* rest of the buffer has mode */
+  memcpy(_mode, &(tftp_header->trail_buf[pos + 1]), 8 * sizeof(char));
+
+  printf("request file: %s, mode: %s\n", filename, _mode);
+  return TFTP_OK;
+}
+
+// given file name, open file, prints file size.
+tftp_err_t open_file(FILE **fp, char *filename) {
+  *fp = fopen(filename, "r");
+  if (*fp == NULL) {
+    printf("file: %s. open failed.\n", filename);
+    return TFTP_FAIL;
+  }
+
+  fseek(*fp, 0, SEEK_END);
+  off_t size = ftell(*fp); // long int, get file size
+  printf("filename: %s, size: %ld\n", filename, size);
+  fseek(*fp, 0, SEEK_SET);
+  return TFTP_OK;
+}
+
 // ------- END OF INNER UTIL FUNCTIONS ------------
 
 tftp_err_t init(char *port, int *sockfd) {
@@ -198,46 +240,6 @@ tftp_err_t parse_header(char *buf, size_t numbytes, opcode_t *opcode) {
   return TFTP_OK;
 }
 
-tftp_err_t parse_rrq(char *buf, size_t len_buf, char *filename,
-                     tftp_mode_t *mode) {
-  /* trailing buffer now has filename and the mode. According to RFC, the file
-        name is followed by a 0. Locate that 0 */
-  tftp_header_t *tftp_header = (tftp_header_t *)buf;
-  char _mode[9]; // netascii, octet or mail, should never exceed 8 bytes
-
-  char *pos_ptr = strchr(tftp_header->trail_buf, 0);
-  /* in case pos reaches the end of the file, it's a problem */
-  int pos = (pos_ptr == NULL ? -1 : pos_ptr - tftp_header->trail_buf);
-
-  if (pos < 0) {
-    perror("filename not valid\n");
-    return TFTP_FAIL;
-  }
-
-  /* extract filename from the trail buffer */
-  memcpy(filename, tftp_header->trail_buf, pos);
-
-  /* rest of the buffer has mode */
-  memcpy(_mode, &(tftp_header->trail_buf[pos + 1]), 8 * sizeof(char));
-
-  printf("request file: %s, mode: %s\n", filename, _mode);
-  return TFTP_OK;
-}
-
-// given file name, open file, prints file size.
-tftp_err_t open_file(FILE **fp, char *filename) {
-  *fp = fopen(filename, "r");
-  if (*fp == NULL) {
-    printf("file: %s. open failed.\n", filename);
-    return TFTP_FAIL;
-  }
-
-  fseek(*fp, 0, SEEK_END);
-  off_t size = ftell(*fp); // long int, get file size
-  printf("filename: %s, size: %ld\n", filename, size);
-  fseek(*fp, 0, SEEK_SET);
-  return TFTP_OK;
-}
 // given RRQ buffer, its length, and remote address, enter handling routine
 tftp_err_t rrq_handler(char *buf, size_t numbytes,
                        struct sockaddr client_addr) {

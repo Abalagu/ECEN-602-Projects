@@ -28,13 +28,12 @@ typedef enum error_code_t {
   NO_SUCH_USER = 7,
 } error_code_t;
 
-// define enum for two file type
-typedef enum tftp_mode_t { NETASCII = 1, OCTET = 2 } tftp_mode_t;
 
 typedef struct tftp_header_t {
   uint16_t opcode;
   char trail_buf[MAXBUFLEN];
 } tftp_header_t;
+
 
 typedef struct tftp_data_packet_t {
   uint16_t opcode;
@@ -42,12 +41,14 @@ typedef struct tftp_data_packet_t {
   char payload[512];
 } tftp_data_packet_t;
 
+
 typedef struct tftp_error_packet_t {
   uint16_t opcode;
   uint16_t error_code;
   char error_msg[128];
   uint8_t trailing_zero; // empty byte from the spec
 } tftp_error_packet_t;
+
 
 typedef struct tftp_ack_packet_t {
   uint16_t opcode;
@@ -62,10 +63,13 @@ tftp_err_t init(char *port, int *sockfd);
 tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
                          struct sockaddr *their_addr);
 
-// given buffer and numbytes, return opcode from its header
-tftp_err_t parse_header(char *buf, size_t numbytes, opcode_t *opcode);
+// given buffer , return opcode from its header
+tftp_err_t parse_header(char *buf, opcode_t *opcode);
 
 
 // given RRQ buffer, its length, and remote address, enter handling routine
 tftp_err_t rrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr);
+
+tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr);
+
 #endif

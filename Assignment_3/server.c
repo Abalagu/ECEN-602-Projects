@@ -27,7 +27,15 @@ tftp_err_t main(int argc, char *argv[]) {
     if (!fork()) {
       close(listen_fd); // close listening socket in child process
 
-      parse_header(buf_recv, numbytes, &opcode);
+  	// if (DEBUG) {
+  	// 	printf("[Packet size] %ld\n", numbytes);
+  	// 	printf("[Packet content] : \n" );
+  	// 	for (int i = 0; i < numbytes; i++) {
+  	// 		printf(" [%d]:", i);
+  	// 		printf(" %d %c\n",buf_recv[i], buf_recv[i]);
+  	// 	} 
+  	// }
+      parse_header(buf_recv, &opcode);
       if (opcode == RRQ) {
         if (rrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
           printf("EXIT ON OK.\n");
@@ -37,7 +45,12 @@ tftp_err_t main(int argc, char *argv[]) {
       }
       if (opcode == WRQ) {
         // TODO: add WRQ handling
-        printf("WRQ not handled.\n");
+        if (wrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
+          printf("TFTP_OK\n");
+        } else {
+          printf("TFTP_FAIL\n");
+        }
+        // printf("WRQ not handled.\n");
       }
       exit(0);
     } else {

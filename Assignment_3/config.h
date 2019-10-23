@@ -20,7 +20,7 @@
 #include <sys/stat.h>
 #include <byteswap.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define MAXBUFLEN 512 
 #define MAX_FILE_NAME 255

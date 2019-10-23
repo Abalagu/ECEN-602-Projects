@@ -59,10 +59,10 @@ void get_peer_info(int sockfd, struct sockaddr_storage addr) {
     inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
   }
 
-  if (DEBUG) {
-    printf("Peer IP address: %s\n", ipstr);
-    printf("Peer port      : %d\n", port);
-  }
+  // if (DEBUG) {
+  //   printf("Peer IP address: %s\n", ipstr);
+  //   printf("Peer port      : %d\n", port);
+  // }
 }
 
 // copy error packet to buffer, handle endian issue
@@ -109,9 +109,10 @@ tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
   return TFTP_OK;
 }
 
-size_t write_data_to_file(FILE **fd, char *buf) {
+size_t write_data_to_file(FILE **fd, char *buf, size_t numbytes) {
   // size_t fwrite(const void *ptr, size_t size_of_elements, size_t number_of_elements, FILE *a_file);
-  return(fwrite(buf, 1, MAXBUFLEN, *fd));
+  size_t num_bytes = fwrite(buf, 1, numbytes, *fd);
+  // printf("buf size written:%lu\n", num_bytes);
 }
 
 // read from fp into buf_send, numbytes read returned for EOF decision
@@ -169,11 +170,13 @@ tftp_err_t parse_ack_packet(char *buf_recv, uint16_t block_num) {
 }
 
 
-tftp_err_t parse_data_packet(char *buf, uint16_t *block_num) {
+tftp_err_t parse_data_packet(char *buf, uint16_t *block_num, size_t *numbytes) {
   tftp_data_packet_t *data_packet = (tftp_data_packet_t *) buf;
 
   // ntoh order
   *block_num = bswap_16(data_packet->block_num);
+  memcpy(buf, data_packet->payload, *numbytes);
+  return TFTP_OK;
 }
 
 
@@ -263,7 +266,8 @@ tftp_err_t tftp_recvfrom(int sockfd, char *buf, size_t *numbytes,
   // char s[INET6_ADDRSTRLEN] = {0};
   socklen_t addr_len = sizeof their_addr;
 
-  if ((*numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1, 0, their_addr,
+  // accouting for maximum data receivable
+  if ((*numbytes = recvfrom(sockfd, buf, DATA_PACKET_LEN, 0, their_addr,
                             &addr_len)) == -1) {
     perror("recvform");
     return TFTP_FAIL;
@@ -314,7 +318,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
     char copy_fn[10];
     strncpy(copy_fn, filename, 10);
     copy_fn[9] = '\0'; // trunc it to 10, else filename >> error_msg   
-    sprintf(error_msg, "file '%s' not found.", copy_fn);
+    sprintf(error_msg, "file '%s'... not found.", copy_fn);
 
     printf("%s\n", error_msg);
     make_error_packet(FILE_NOT_FOUND, error_msg, buf_send);
@@ -393,7 +397,7 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
         
   // mode: netascii, octet or mail, should never exceed 8 bytes
 
-	uint16_t block_num = 0, last_block_ack;
+	uint16_t block_num = 0, last_block_ack = 0;
   int sockfd, timeout_counter = 0;
   opcode_t opcode;
   FILE *fd;
@@ -417,7 +421,7 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
     char copy_fn[10];
     strncpy(copy_fn, filename, 10);
     copy_fn[9] = '\0';
-    sprintf(error_msg, "file '%s' already exists.", copy_fn);
+    sprintf(error_msg, "file '%s'... already exists.", copy_fn);
 
     printf("%s\n", error_msg);
     make_error_packet(FILE_EXISTS, error_msg, buf_send);
@@ -440,10 +444,13 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
 
     if (sendto(sockfd, buf_send, 4, 0, &client_addr, sizeof client_addr) == -1) {
       printf("server: ACK not sent, Connection failed\n");
-    }
+    } 
 
     // update block ack 
     last_block_ack = block_num;
+
+    if (DEBUG)
+      printf("last_block_ack:%d\n", last_block_ack);
 
     if (_EOF) {
       // safely return
@@ -469,6 +476,9 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
 
     // client will send the next data packet if recieved an ACK
     tftp_recvfrom(sockfd, buf_recv, &numbytes, &client_addr);
+
+    if (DEBUG)
+      printf("recvfrom numbytes: %lu\n", numbytes);
     // parse recieved packet
     parse_header(buf_recv, &opcode);
 
@@ -484,9 +494,14 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
     }
 
     if (opcode == DATA) {
-      if (parse_data_packet(buf_recv, &block_num) == TFTP_OK) {
+      numbytes -= 4;      // accouting for opcode and block number
+      if (parse_data_packet(buf_recv, &block_num, &numbytes) == TFTP_OK) {
+
+        if (DEBUG)
+          printf("block Number:%d\n", block_num);
+
         if (block_num > last_block_ack) {
-          numbytes = write_data_to_file(&fd, buf_recv);
+          write_data_to_file(&fd, buf_recv, numbytes);
         } else {
           // Duplicate Frame Recieved, Send an ACK again
         }

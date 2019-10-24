@@ -30,12 +30,59 @@ void print_hex(void *array, size_t len) {
   printf("\n");
 }
 
+
+char nextchar = -1;
+
 // given block_num, read file to buffer
-int read_block(FILE **fp, uint16_t block_num, char *buf) {
-  size_t numbytes = fread(buf, 1, MAXBUFLEN, *fp);
-  // TODO: #block print disabled for performance issue
-  // printf("#block: %d, size: %ld\n", block_num, numbytes);
-  return numbytes;
+int read_block(FILE **fp, uint16_t block_num, char *buf, char *mode) {
+  if (!strcmp(mode, "netascii")) {
+    size_t numbytes;
+
+    // size_t numbytes = fread(buf, 1, MAXBUFLEN, *fp);
+    char c;
+    for (numbytes = 0; numbytes < MAXBUFLEN; numbytes++) {
+
+      if (nextchar >= 0) {
+        *buf++ = nextchar;
+        nextchar = -1;
+        continue;
+      }
+      
+      c = fgetc(*fp);
+
+      if (c == EOF) {
+        if (ferror(*fp)) {
+          // read error
+          printf("READ ERROR FROM GETC ON LOCAL FILE\n");
+          return -1;
+        }
+        // _EOF_REACHED_
+        break;
+      } else if (c == '\n') {
+        // _LF_encountered__, insert CR
+        c == '\r';
+        nextchar = '\n';
+
+      } else if (c == '\r') {
+        // _CR_encountered__, insert null after it
+        nextchar  == '\0';
+
+      } else 
+        nextchar = -1;
+
+      *buf++ = c;
+
+    }
+
+    return numbytes;
+  } else if (!strcmp(mode, "octet")) {
+    size_t numbytes = fread(buf, 1, MAXBUFLEN, *fp);
+    // TODO: #block print disabled for performance issue
+    // printf("#block: %d, size: %ld\n", block_num, numbytes);
+    return numbytes;
+  } else {
+    return -1;
+  }
 }
 
 // get connected peer (remote) IP address port number
@@ -117,11 +164,17 @@ size_t write_data_to_file(FILE **fd, char *buf, size_t numbytes) {
 
 // read from fp into buf_send, numbytes read returned for EOF decision
 tftp_err_t make_data_packet(FILE **fp, uint16_t block_num, char *buf_send,
-                            size_t *numbytes) {
+                            size_t *numbytes, char *mode) {
   tftp_data_packet_t data_packet = {0};
   data_packet.opcode = DATA;
   data_packet.block_num = block_num;
-  *numbytes = read_block(fp, block_num, data_packet.payload);
+  *numbytes = read_block(fp, block_num, data_packet.payload, mode); 
+
+  if (*numbytes == -1) {
+    // error in local file read
+    return TFTP_FAIL;
+  }
+
   data_to_buffer(buf_send, data_packet);
 
   return TFTP_OK;
@@ -341,7 +394,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
   }
 
   while (1) {
-    make_data_packet(&fp, block_num, buf_send, &numbytes);
+    make_data_packet(&fp, block_num, buf_send, &numbytes, mode);
     // if read less than 512 bytes of data, reached EOF
     is_EOF = (numbytes < MAXBUFLEN);
 

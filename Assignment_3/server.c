@@ -23,18 +23,23 @@ tftp_err_t main(int argc, char *argv[]) {
   }
 
   while (1) {
-    tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr);
+    if (tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr) == TFTP_OK) {
+      printf("aaya\n");
+    }
+    
     if (!fork()) {
+      // child process
       close(listen_fd); // close listening socket in child process
 
-  	// if (DEBUG) {
-  	// 	printf("[Packet size] %ld\n", numbytes);
-  	// 	printf("[Packet content] : \n" );
-  	// 	for (int i = 0; i < numbytes; i++) {
-  	// 		printf(" [%d]:", i);
-  	// 		printf(" %d %c\n",buf_recv[i], buf_recv[i]);
-  	// 	} 
-  	// }
+    	if (DEBUG) {
+    		printf("[Packet size] %ld\n", numbytes);
+    		printf("[Packet content] : \n" );
+    		for (int i = 0; i < numbytes; i++) {
+    			printf(" [%d]:", i);
+    			printf(" %d %c\n",buf_recv[i], buf_recv[i]);
+    		} 
+    	}
+
       parse_header(buf_recv, &opcode);
       if (opcode == RRQ) {
         if (rrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
@@ -54,8 +59,8 @@ tftp_err_t main(int argc, char *argv[]) {
       }
       exit(0);
     } else {
-      wait(NULL);
-      printf("parent wait end\n\n");
+      // parent process
+      continue;
     }
   }
 

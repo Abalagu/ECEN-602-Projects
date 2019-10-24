@@ -23,9 +23,7 @@ tftp_err_t main(int argc, char *argv[]) {
   }
 
   while (1) {
-    if (tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr) == TFTP_OK) {
-      printf("aaya\n");
-    }
+    tftp_recvfrom(listen_fd, buf_recv, &numbytes, &client_addr); 
     
     if (!fork()) {
       // child process

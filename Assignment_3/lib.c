@@ -42,30 +42,26 @@ int read_block(FILE **fp, uint16_t block_num, char *buf, char *mode) {
     char c;
     for (numbytes = 0; numbytes < MAXBUFLEN; numbytes++) {
 
-      if (nextchar >= 0) {
+      if (nextchar >= 0) {  
         *buf++ = nextchar;
         nextchar = -1;
         continue;
       }
       
-      c = fgetc(*fp);
+      c = getc(*fp);
 
       if (c == EOF) {
         if (ferror(*fp)) {
           // read error
           printf("READ ERROR FROM GETC ON LOCAL FILE\n");
-          return -1;
         }
-        // _EOF_REACHED_
-        break;
+        return numbytes;
       } else if (c == '\n') {
-        // _LF_encountered__, insert CR
-        c == '\r';
+        c = '\r';
         nextchar = '\n';
 
       } else if (c == '\r') {
-        // _CR_encountered__, insert null after it
-        nextchar  == '\0';
+        nextchar  = '\0';
 
       } else 
         nextchar = -1;

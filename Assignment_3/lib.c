@@ -152,10 +152,50 @@ tftp_err_t data_to_buffer(char *buf_send, tftp_data_packet_t data_packet) {
   return TFTP_OK;
 }
 
-size_t write_data_to_file(FILE **fd, char *buf, size_t numbytes) {
-  // size_t fwrite(const void *ptr, size_t size_of_elements, size_t number_of_elements, FILE *a_file);
-  size_t num_bytes = fwrite(buf, 1, numbytes, *fd);
-  // printf("buf size written:%lu\n", num_bytes);
+char _nextchar = -1;
+
+size_t write_data_to_file(FILE **fd, char *buf, size_t _numbytes, char *mode) {
+  if (!strcmp(mode, "netascii")) {
+    size_t numbytes;
+    // numbytes = fwrite(buf, 1, _numbytes, *fd);
+
+    char c;
+    for (numbytes = 0; numbytes < _numbytes; numbytes++) {
+
+      if (_nextchar >= 0) {  
+        // *buf++ = nextchar;
+        putc(_nextchar, *fd);
+        _nextchar = -1;
+        continue;
+      }
+      
+      c = buf[numbytes];
+
+      if (c == EOF) {
+        return numbytes;
+      } else if (c == '\r') {
+        if (buf[numbytes+1] == '\0') {
+          numbytes++;
+        } else if (buf[numbytes+1] == '\n') {
+          c = '\n';
+          numbytes++;
+        }
+      } else 
+        _nextchar = -1;
+
+      // *buf++ = c;
+      putc(c, *fd);
+
+    }
+
+    return numbytes;
+  } else if (!strcmp(mode, "octet")) {
+    size_t numbytes = fwrite(buf, 1, _numbytes, *fd);
+    // printf("buf size written:%lu\n", num_bytes);
+    return numbytes;
+  } else {
+    return -1;
+  }
 }
 
 // read from fp into buf_send, numbytes read returned for EOF decision
@@ -550,7 +590,7 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
           printf("block Number:%d\n", block_num);
 
         if (block_num > last_block_ack) {
-          write_data_to_file(&fd, buf_recv, numbytes);
+          write_data_to_file(&fd, buf_recv, numbytes, mode);
         } else {
           // Duplicate Frame Recieved, Send an ACK again
         }

@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <byteswap.h>
+#include <signal.h>
 
 #define DEBUG 0 
 

@@ -8,7 +8,7 @@ if [ ! -d "$test_folder" ]; then
     mkdir $test_folder
 fi
 
-server_folder=$test_folder/tftp_server
+server_folder=$test_folder/server
 # check server folder existence
 if [ ! -d "$server_folder" ]; then
     mkdir $server_folder

@@ -9,8 +9,8 @@ if [ ! -d "$test_folder" ]; then
     mkdir $test_folder
 fi
 
-client_folder=$test_folder/tftp_client
-server_folder=$test_folder/tftp_server
+client_folder=$test_folder/client
+server_folder=$test_folder/server
 
 # check existence, then move to testing folder
 if [ -d "$client_folder" ]; then

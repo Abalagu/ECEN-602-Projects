@@ -1,7 +1,18 @@
 #include "config.h"
 #include "lib.h"
 
+void sigchld_handler(int s) {
+    // waitpid() might overwrite errno, so we save and restore it:
+    int saved_errno = errno;
+    while(waitpid(-1, NULL, WNOHANG) > 0);
+    errno = saved_errno;
+}
+
+
 tftp_err_t main(int argc, char *argv[]) {
+
+  struct sigaction sa;
+
   if (argc != 2) {
     printf("usage: ./server port\n");
     return 1;
@@ -20,6 +31,15 @@ tftp_err_t main(int argc, char *argv[]) {
   if (init(port, &listen_fd) == TFTP_FAIL) {
     printf("INIT FAILED.\n");
     return TFTP_FAIL;
+  }
+
+  // reap_dead_processes
+  sa.sa_handler = sigchld_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART;
+  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+    perror("sigaction");
+    exit(1);
   }
 
   while (1) {

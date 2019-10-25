@@ -4,7 +4,8 @@
 
 * Luming Xu
   - RRQ
-  - `launch_tests.sh` (automated test cases)
+  - `run_server.sh`   : creates test files and folders
+  - `launch_tests.sh` : runs test cases
   - Binary file test cases
 
 * Akhilesh Rawat

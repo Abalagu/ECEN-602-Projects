@@ -4,6 +4,7 @@
 
 * Luming Xu
   - RRQ
+  - `launch_tests.sh` (automated test cases)
   - Binary file test cases
 
 * Akhilesh Rawat
@@ -32,6 +33,8 @@ We implement the WRQ feature in the server. The client can write both binary and
 * Error packets are replied to the client when the requested file name doesn't exist under the tftp server folder or if the client attempts to write a file which already exists.
 
 * Packet timeout is implemented by using timer tv in the select call of the child process. When 10 consecutive timeout happens, the server replies with an ERROR packet, and terminates the corresponding child process.
+
+* For ascii files, the server recognizes the mode and reads and writes the files accordingly by updating line endings to preserve the file format. The `read_block` and `write_data_to_file` implement the relevant logic.
 
 ## Source Code
 
@@ -858,7 +861,5 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr);
 #define MAX_RETRY 10
 #endif
 ```
-* Packet timeout is implemented by using timer tv in the select call of the child process.  When 10 consecutive timeout happens, the server replies with an ERROR packet, and terminates the corresponding child process.  
 
-* For ascii files, the server recognizes the mode and reads and writes the files accordingly by updating line endings to preserve the file format. The `read_block` and `write_data_to_file` implement the relevant logic.
 

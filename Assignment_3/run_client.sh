@@ -28,6 +28,7 @@ cmp $client_folder/$file_name $server_folder/$file_name
 retval=$?
 if [ $retval -eq 0 ]; then
     echo "test case 1: $file_name. diff: same file"
+    echo ""
 fi
 
 # test case 2
@@ -38,6 +39,18 @@ cmp $client_folder/$file_name $server_folder/$file_name
 retval=$?
 if [ $retval -eq 0 ]; then
     echo "test case 2: $file_name. diff: same file"
+    echo ""
+fi
+
+# test case 3
+file_name=test_case_3.txt
+tftp localhost 4950 -v -m ascii -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo "test case 2: $file_name. diff: same file"
+    echo ""
 fi
 
 # test case 4
@@ -48,4 +61,5 @@ cmp $client_folder/$file_name $server_folder/$file_name
 retval=$?
 if [ $retval -eq 0 ]; then
     echo "test case 4: $file_name. diff: same file"
+    echo ""
 fi

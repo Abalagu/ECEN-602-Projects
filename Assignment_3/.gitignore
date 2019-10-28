@@ -12,3 +12,6 @@
 
 # Ignore test folder
 test/
+
+# Add test case screenshot
+!test_cases/

@@ -445,7 +445,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
       if (timeout_counter == MAX_RETRY) {
         // disconnect on 10 consecutive timeout
         close(sockfd);
-        printf("remote disconnected. %d consecutive timeout.\n", MAX_RETRY);
+        printf("file '%s' transfer terminated. %d consecutive timeout.\n", filename, MAX_RETRY);
         return TFTP_FAIL;
       }
       continue; // skip below routine, try to resend
@@ -556,7 +556,7 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
       if (timeout_counter == MAX_RETRY) {
         // disconnect on MAX_RETRY attempts
         close(sockfd);
-        printf("remote disconnected. %d consecutive timeout.\n", MAX_RETRY);
+        printf("file '%s' transfer terminated. %d consecutive timeout.\n", filename, MAX_RETRY);
         return TFTP_FAIL;
       } else {
         continue;

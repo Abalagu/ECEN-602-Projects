@@ -61,17 +61,17 @@ tftp_err_t main(int argc, char *argv[]) {
       parse_header(buf_recv, &opcode);
       if (opcode == RRQ) {
         if (rrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
-          printf("EXIT ON OK.\n");
+          printf("EXIT ON OK.\n\n");
         } else {
-          printf("EXIT ON ERROR.\n");
+          printf("EXIT ON ERROR.\n\n");
         }
       }
       if (opcode == WRQ) {
         // TODO: add WRQ handling
         if (wrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
-          printf("TFTP_OK\n");
+          printf("TFTP_OK\n\n");
         } else {
-          printf("TFTP_FAIL\n");
+          printf("TFTP_FAIL\n\n");
         }
         // printf("WRQ not handled.\n");
       }

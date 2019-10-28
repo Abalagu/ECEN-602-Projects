@@ -3,31 +3,32 @@
 ## Role of Team Members
 
 * Luming Xu
-  - RRQ
-  - `run_server.sh`   : creates test files and folders
-  - `launch_tests.sh` : runs test cases
-  - Binary file test cases
+  + RRQ
+  + `run_server.sh` : creates test files and folders
+  + `launch_tests.sh` : runs test cases
+  + Binary file test cases
 
 * Akhilesh Rawat
-  - WRQ
-  - Ascii File transfer for WRQ and RRQ
-  - Ascii file test cases
+  + WRQ
+  + Ascii File transfer for WRQ and RRQ
+  + Ascii file test cases
 
 ## Bonus Points
 
 We implement the WRQ feature in the server. The client can write both binary and ascii files to the server and retrieve them later. The files maintain their format and are identical to the line endings as is desired. We test the following features:
-  - transfer binary files of sizes 2047B, 2048B and 3MB from client to the server and retrieve them later
-  - transfer ascii files with different line endings from client to the server and retrieve them later
-  - timeout if the client disconnects while transfer
-  - simultaneous writes to the server.
-  - error if the file already exists at the server
+
+  + transfer binary files of sizes 2047B, 2048B and 3MB from client to the server and retrieve them later
+  + transfer ascii files with different line endings from client to the server and retrieve them later
+  + timeout if the client disconnects while transfer
+  + simultaneous writes to the server.
+  + error if the file already exists at the server
 
 ## Program Architecture
 
-* On a RRQ or WRQ request from a client, the server creats a child process for each request. This way the server is able to handle multiple client RRQ  and WRQ requests and transmit simutaneously. 
+* On a RRQ or WRQ request from a client, the server creats a child process for each request. This way the server is able to handle multiple client RRQ  and WRQ requests and transmit simutaneously.
 
 * `lib.c` provides with construction and parse APIs for various packet types.
-* Various server parameters can be configured with `config.h`.
+* Various server parameters can be configured with `config.h` .
 
 * Block number wrap around is implemented by utilizing overflow of `uint16_t` .
 
@@ -37,7 +38,236 @@ We implement the WRQ feature in the server. The client can write both binary and
 
 * For ascii files, the server recognizes the mode and reads and writes the files accordingly by updating line endings to preserve the file format. The `read_block` and `write_data_to_file` implement the relevant logic.
 
+## Execution Guide
+
+1.execute `run_server.sh` 
+
+2.execute `launch_tests.sh` 
+
+### Notes on execution
+
+*  Shell scripts are written to automatically go through test cases.
+
+* Script `run_server.sh` launches the TFTP server, and generate test files under test folder.
+
+* Script `launch_tests.sh` send TFTP client requests to TFTP server, and use `cmp` system call to compare source and destination files.
+
+*  Note that termination of transfer need manual action, by timely pressing Ctrl+C when prompted.
+
+*  Test case 6 (simutaneous transfer) is tested and screenshot posted separately.
+
+## Test Cases
+
+* screenshots have all the test cases included (including bonus features).
+
+### Test cases 1 to 7
+
+![test case 1-7](./test_cases/case_1_to_7.png)
+
+### Test case 6
+
+![test case 6](./test_cases/case_6.png)
+
+### Bonus Feature Test cases 8.1 to 8.7
+
+![test case 8.1 to 8.7](./test_cases/case_8.1_to_8.7.png)
+
 ## Source Code
+
+### run_server.sh
+
+``` shell
+# server shell
+
+clear
+
+BASEDIR=$PWD
+
+rm -r $BASEDIR/test/
+
+# create test folder, included in .gitignore
+test_folder=$BASEDIR/test
+if [ ! -d "$test_folder" ]; then
+    mkdir $test_folder
+fi
+
+server_folder=$test_folder/server
+# check server folder existence
+if [ ! -d "$server_folder" ]; then
+    mkdir $server_folder
+fi
+
+# test case 1: 2048 Bytes
+base64 /dev/urandom | head -c 2K >$server_folder/binary_2048B
+# test case 2: 2047 Bytes
+base64 /dev/urandom | head -c 2047 >$server_folder/binary_2047B
+# test case 3: text file with several CRs, copy from main folder
+cp $BASEDIR/test_case_3.txt $server_folder/test_case_3.txt
+# test case 4: 34 MB
+base64 /dev/urandom | head -c 34MB >$server_folder/binary_34MB
+echo "test files generated."
+
+make clean
+make
+retval=$? # store retval of make
+
+if [ $retval -eq 0 ]; then # make without error
+    mv ./server $server_folder # move server to test directory
+    cd $server_folder
+    pwd
+    ./server 4950 # launch server
+else
+    echo MAKE ERROR.
+fi
+
+```
+
+### launch_tests.sh
+
+``` shell
+# client shell
+
+clear
+
+BASEDIR=$PWD
+# create test folder, included in .gitignore
+test_folder=$BASEDIR/test
+if [ ! -d "$test_folder" ]; then
+    mkdir $test_folder
+fi
+
+client_folder=$test_folder/client
+server_folder=$test_folder/server
+
+# check existence, then move to testing folder
+if [ -d "$client_folder" ]; then
+    cd $client_folder
+else
+    mkdir $client_folder
+    cd $client_folder
+fi
+
+# test case 1
+echo -e "TEST CASE 1"
+file_name=binary_2048B
+tftp localhost 4950 -v -m binary -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 1: $file_name. diff: same file\n"
+fi
+
+# test case 2
+echo -e "TEST CASE 2"
+file_name=binary_2047B
+tftp localhost 4950 -v -m binary -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 2: $file_name. diff: same file\n"
+fi
+
+# test case 3
+echo -e "TEST CASE 3"
+file_name=test_case_3.txt
+tftp localhost 4950 -v -m ascii -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 2: $file_name. diff: same file\n"
+fi
+
+# test case 4
+echo -e "TEST CASE 4"
+file_name=binary_34MB
+tftp localhost 4950 -v -m binary -c get $file_name
+# compare files
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo "test case 4: $file_name. diff: same file"
+    echo ""
+fi
+
+# test case 5
+echo -e "TEST CASE 5"
+file_name=non_existent
+tftp localhost 4950 -v -m binary -c get $file_name
+
+# test case 6
+echo -e "\nTEST CASE 6: see local screenshot\n"
+
+# test case 7
+echo -e "TEST CASE 7"
+file_name=binary_34MB
+# test the behavior of server when client disconnects in the middle of transmission
+echo "!Press Ctrl+C for test case 7"
+tftp localhost 4950 -v -m binary -c get $file_name
+echo "should see timeout on server termiinal"
+
+# rename local client files to different names, to avoid filename collision
+
+# test case 8.1
+echo -e "\nTEST CASE 8.1 put 2048B"
+mv binary_2048B binary_2048B.bak
+file_name=binary_2048B.bak
+tftp localhost 4950 -v -m binary -c put $file_name
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 2: $file_name. diff: same file\n"
+fi
+
+# test case 8.2
+echo -e "\nTEST CASE 8.2 put 2047B"
+mv binary_2047B binary_2047B.bak
+file_name=binary_2047B.bak
+tftp localhost 4950 -v -m binary -c put $file_name
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 2: $file_name. diff: same file\n"
+fi
+
+# test case 8.3
+echo -e "\nTEST CASE 8.3 put 34MB"
+mv binary_34MB binary_34MB.bak
+file_name=binary_34MB.bak
+tftp localhost 4950 -v -m binary -c put $file_name
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 2: $file_name. diff: same file\n"
+fi
+
+# test case 8.4
+echo -e "\nTEST CASE 8.4 put ascii file"
+mv test_case_3.txt test_case_3.txt.bak
+file_name=test_case_3.txt.bak
+tftp localhost 4950 -v -m binary -c put $file_name
+cmp $client_folder/$file_name $server_folder/$file_name
+retval=$?
+if [ $retval -eq 0 ]; then
+    echo -e "test case 2: $file_name. diff: same file\n"
+fi
+
+# test case 8.5
+echo -e "\nTEST CASE 8.5 non-existent file"
+tftp localhost 4950 -v -m binary -c put whatever_nonexistent
+
+# test case 8.6
+echo -e "TEST CASE 8.6: doesn't need simutaneous connection support from server to client"
+
+# test case 8.7
+echo -e "\nTEST CASE 8.7 put 34MB\n !Press Ctrl+C to terminate"
+mv binary_34MB.bak binary_34MB.bak.bak
+file_name=binary_34MB.bak.bak
+tftp localhost 4950 -v -m binary -c put $file_name
+
+```
 
 ### server.c
 
@@ -104,17 +334,17 @@ tftp_err_t main(int argc, char *argv[]) {
       parse_header(buf_recv, &opcode);
       if (opcode == RRQ) {
         if (rrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
-          printf("EXIT ON OK.\n");
+          printf("EXIT ON OK.\n\n");
         } else {
-          printf("EXIT ON ERROR.\n");
+          printf("EXIT ON ERROR.\n\n");
         }
       }
       if (opcode == WRQ) {
         // TODO: add WRQ handling
         if (wrq_handler(buf_recv, numbytes, client_addr) == TFTP_OK) {
-          printf("TFTP_OK\n");
+          printf("TFTP_OK\n\n");
         } else {
-          printf("TFTP_FAIL\n");
+          printf("TFTP_FAIL\n\n");
         }
         // printf("WRQ not handled.\n");
       }
@@ -593,7 +823,7 @@ tftp_err_t rrq_handler(char *buf, size_t numbytes,
       if (timeout_counter == MAX_RETRY) {
         // disconnect on 10 consecutive timeout
         close(sockfd);
-        printf("remote disconnected. %d consecutive timeout.\n", MAX_RETRY);
+        printf("file '%s' transfer terminated. %d consecutive timeout.\n", filename, MAX_RETRY);
         return TFTP_FAIL;
       }
       continue; // skip below routine, try to resend
@@ -703,7 +933,7 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr) 
       if (timeout_counter == MAX_RETRY) {
         // disconnect on MAX_RETRY attempts
         close(sockfd);
-        printf("remote disconnected. %d consecutive timeout.\n", MAX_RETRY);
+        printf("file '%s' transfer terminated. %d consecutive timeout.\n", filename, MAX_RETRY);
         return TFTP_FAIL;
       } else {
         continue;
@@ -862,5 +1092,4 @@ tftp_err_t wrq_handler(char *buf, size_t numbytes, struct sockaddr client_addr);
 #define MAX_RETRY 10
 #endif
 ```
-
 

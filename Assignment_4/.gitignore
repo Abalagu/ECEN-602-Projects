@@ -1,0 +1,17 @@
+# Ignore all
+*
+
+# Unginore all with extensions
+!*.*
+
+# Ignore all .o files
+*.o
+
+# Ignore IDE config
+.vscode/
+
+# Ignore test folder
+test/
+
+# Add test case screenshot
+!test_cases/

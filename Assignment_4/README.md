@@ -41,7 +41,7 @@
 ## parsing
 
 * for the first line:
-  + retrieve method, protocol, status code, path depending on the type of REQUEST,
+  + retrieve method, protocol, status code, path depending on the type of REQUEST, 
 
 * then pass the rest of the buffer for parsing:
 * pass the char buffer, can be anything with the following format
@@ -65,6 +65,7 @@
     struct.key = value
 
 ## HTTP Client Architecture
+
 * maintain a file descriptors with proxy server
 
 ``` c
@@ -85,8 +86,16 @@ readline();
 ``` c
 # 
 listening_fd = server_init(port);
-select(rfds, wfds, exceptfds);
-client_fd = accept_client(listening_fd);
+while(1){ // infinite loop on listening to new connection
+  client_fd = accept_client(listening_fd); // blocking accept
+  if(!fork()){ // fork a child process to handle new client
+
+  }else{ // parent process
+
+  }
+  
+}
+
 
 ```
 

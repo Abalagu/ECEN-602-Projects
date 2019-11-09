@@ -6,50 +6,49 @@ http_err_t main(int argc, char *argv[]) {
     return HTTP_FAIL;
   }
 
-  char request_line[] = "GET /get HTTP/1.1\n\
-Host: httpbin.org\n\
-User-Agent: PostmanRuntime/7.19.0\n\
-Accept: */*\n\
-Cache-Control: no-cache\n\
-Postman-Token: ff6456d8-34c6-4c58-8e9c-5a45091c2f08,ec4aab86-2482-491a-816b-420dd3613cc5\n\
-Host: httpbin.org\n\
-Accept-Encoding: gzip, deflate\n\
-Connection: keep-alive\n\
-cache-control: no-cache\n\
-";
-  // printf("%s\n", request_line);
+  char request_line[] = "GET /get HTTP/1.0\r\n\r\n";
+  printf("%s\n", request_line);
   char target_site[] = "httpbin.org";
+
+  // char target_site[] = "wikipedia.org";
 
   char *local_ip = argv[1]; // why specify ip other than localhost?
   char *local_port = argv[2];
-  int listen_fd;
+  int listen_fd, client_fd, server_fd;
   char buf_send[1500] = {0};
   char buf_recv[1500] = {0};
-  // struct sigaction sa;
+  int numbytes = 0;
+  printf("local_ip: %s, local_port:%s\n", local_ip, local_port);
 
-  // reap_dead_processes
-  // sa.sa_handler = sigchld_handler;
-  // sigemptyset(&sa.sa_mask);
-  // sa.sa_flags = SA_RESTART;
-  // if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-  //   perror("sigaction");
-  //   exit(1);
-  // }
-
-  server_init(local_port, &listen_fd);
+  if (server_init(local_port, &listen_fd) != HTTP_OK) {
+    return HTTP_FAIL;
+  }
+  // printf("listening fd: %d\n", listen_fd);
+  printf("server listening to client connection...\n");
+  if (accept_client(listen_fd, &client_fd) != HTTP_OK) {
+    return HTTP_FAIL;
+  };
 
   if (!fork()) { // child process
-    recv(listen_fd, buf_recv, sizeof(buf_recv), 0);
-    int sockfd = server_lookup_connect(target_site, REMOTE_PORT);
-    memcpy(buf_send, target_site, sizeof(target_site));
-    writen(sockfd, buf_send, sizeof(buf_send));
-    readline(sockfd, buf_recv);
+
+    numbytes = readline(client_fd, buf_recv);
+    printf("client message: %s\n", buf_recv);
+    if (server_lookup_connect(target_site, REMOTE_PORT, &server_fd) !=
+        HTTP_OK) {
+      return HTTP_FAIL;
+    };
+    // copy http request line from client message
+    // memcpy(buf_send, request_line, sizeof(request_line));
+    memcpy(buf_send, buf_recv, sizeof(request_line));
+
+    writen(server_fd, buf_send, sizeof(buf_send));
+    readline(server_fd, buf_recv);
+    printf("server return:\n");
     printf("%s", buf_recv);
+    writen(client_fd, buf_recv, sizeof(buf_recv));
     printf("child process returns\n");
     exit(0);
   } else { // parent process
-    // break;
-    // continue;
     printf("parent process returns\n");
     wait(NULL);
   }

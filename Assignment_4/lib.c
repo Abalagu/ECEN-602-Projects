@@ -1,6 +1,20 @@
 
 #include "lib.h"
 
+// given sockfd, return local port
+http_err_t get_sock_port(int sockfd, int *local_port) {
+  struct sockaddr_in sin;
+  int addrlen = sizeof(sin);
+  if (getsockname(sockfd, (struct sockaddr *)&sin, &addrlen) == 0 &&
+      sin.sin_family == AF_INET && addrlen == sizeof(sin)) {
+    *local_port = ntohs(sin.sin_port);
+    return HTTP_OK;
+  } else {
+    printf("find port error.\n");
+    return HTTP_FAIL;
+  }
+}
+
 void *get_in_addr(struct sockaddr *sa) {
   if (sa->sa_family == AF_INET) {
     return &(((struct sockaddr_in *)sa)->sin_addr);
@@ -8,10 +22,9 @@ void *get_in_addr(struct sockaddr *sa) {
   return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
-int server_lookup_connect(char *host, char *server_port) {
+http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd) {
   struct addrinfo hints, *server_info, *p;
   int status;
-  int sock_fd;
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -21,19 +34,19 @@ int server_lookup_connect(char *host, char *server_port) {
   // argv[2]: Port
   if ((status = getaddrinfo(host, server_port, &hints, &server_info)) != 0) {
     fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-    return -2;
+    return HTTP_FAIL;
   }
 
   for (p = server_info; p != NULL; p = p->ai_next) { // loop through link list
-    sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (sock_fd == -1) { // socket creation failed
+    *sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+    if (*sock_fd == -1) { // socket creation failed
       perror("client: socket");
       continue;
     }
 
-    if (connect(sock_fd, p->ai_addr, p->ai_addrlen) ==
+    if (connect(*sock_fd, p->ai_addr, p->ai_addrlen) ==
         -1) { // connection failed
-      close(sock_fd);
+      close(*sock_fd);
       perror("client: connect");
       continue;
     }
@@ -41,13 +54,13 @@ int server_lookup_connect(char *host, char *server_port) {
   }
   if (p == NULL) {
     fprintf(stderr, "client: failed to connect\n");
-    return -2;
+    return HTTP_FAIL;
   }
 
-  printf("client: connected to %s:%s\n", host, server_port);
+  printf("connected to %s:%s\n", host, server_port);
 
   freeaddrinfo(server_info);
-  return sock_fd;
+  return HTTP_OK;
 }
 
 int writen(int sockfd, char *buf, size_t size_buf) {
@@ -78,19 +91,23 @@ void print_hex(void *array, size_t len) {
 }
 
 // given listening socket, accept possible client
-int accept_client(int sockfd) {
-  int new_fd;
+http_err_t accept_client(int listen_fd, int *client_fd) {
   struct sockaddr_storage their_addr; // connector's address information
 
   int sin_size = sizeof(their_addr);
   char str[sin_size];
-  new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+  *client_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
+
+  if(*client_fd <0){
+    perror("accept_client");
+    return HTTP_FAIL;
+  }
 
   inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
             str, sin_size);
 
   printf("server: got conection from %s\n", str);
-  return new_fd;
+  return HTTP_OK;
 }
 
 // launch STREAM socket at given port. port = "" results in ephemeral port.
@@ -126,7 +143,7 @@ http_err_t server_init(char *port, int *sockfd) {
   if (p == NULL) {
     return HTTP_FAIL;
   }
-
+  listen(*sockfd, BACKLOG);
   freeaddrinfo(servinfo);
   int local_port;
   get_sock_port(*sockfd, &local_port);
@@ -134,19 +151,7 @@ http_err_t server_init(char *port, int *sockfd) {
   return HTTP_OK;
 }
 
-// given sockfd, return local port
-http_err_t get_sock_port(int sockfd, int *local_port) {
-  struct sockaddr_in sin;
-  int addrlen = sizeof(sin);
-  if (getsockname(sockfd, (struct sockaddr *)&sin, &addrlen) == 0 &&
-      sin.sin_family == AF_INET && addrlen == sizeof(sin)) {
-    *local_port = ntohs(sin.sin_port);
-    return HTTP_OK;
-  } else {
-    printf("find port error.\n");
-    return HTTP_FAIL;
-  }
-}
+
 
 void sigchld_handler(int s) {
     // waitpid() might overwrite errno, so we save and restore it:

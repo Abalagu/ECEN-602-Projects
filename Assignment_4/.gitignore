@@ -15,3 +15,6 @@ test/
 
 # Add test case screenshot
 !test_cases/
+
+#
+!Makefile

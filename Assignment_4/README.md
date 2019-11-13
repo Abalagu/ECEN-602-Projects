@@ -78,13 +78,24 @@ readline();
 
 ## HTTP Proxy Server Architecture
 
+### difficulties
+
+1. read stream from http server, payload could exceed buffer
+2. dynamically allocate cache memory for received document
+3. implement shared memory for LRU Cache
+4. multithreading for each child process
+
+### implementation notes
+* should use multi-threading, as test case 7 is about simultaneous connection
 * probably better to use only single thread in the proxy server, as cache management across child threads is difficult, need to use shared memory
 * maintain file descriptors with below functionalities:
   + listening to client connection
   + handle communication with client
   + handle communication with remote http server
+* proxy server and http server closes connection at EOF
 
 In the point of view of a proxy server, it takes several stages to complete a cycle:
+
 1. client connection established (listen_fd -> new client_fd)
 2. client http request received (client_fd, read_fds)
 3. server connection established (new server_fd)
@@ -97,7 +108,8 @@ If requested document is not in the cache, then proxy server goes through all si
 If requested document is in the cache and is fresh, then return the cache
 
 ### cache data structure
-```c
+
+``` c
 typedef struct cache {
   document[];
   
@@ -122,7 +134,8 @@ http_err_t prepare_document(char *http_response){
 }
 
 int main(){
-  // proxy server and http server closes connection at EOF
+  // 
+  
   listen_fd = server_init(port); // persistent open until end of execution
   // only maintain server_fd in the list, as listen_fd requieres different action
   // need a data structure to maintain add and delete of fds

@@ -21,6 +21,8 @@ int main(){
 1. Spawn a child process only during file streaming from proxy server to a client
 2. Maintain a LRU cache only in the parent proxy server process
 3. Proxy server retrieve a document to local memory, then fork a process to stream to client.  All LRU cache modification happens before fork.  Terminate the process after streaming.  
+4. Maintain only one socket connection to the remote server.  Even if in a multi-threading architecture, read from server / write to cache should be blocking.  
+
 
 #### Side Notes
 * If spawn a child process starting from connection, and implement LRU cache in the shared memory across all child processes, both read and write from LRU cache will cause memory content to change, thus simultaneous read is impossible, one has to make read from cache ordered.  
@@ -44,6 +46,10 @@ int main(){
     * if cache miss and cache not full:
         add new
 
+* Several large file streaming from server to proxy server could be made concurrent by fork
+* Concurrent LRU cache operation could result in conflict, modification posed by the previous process needs to be synced to the latter process, why not use single process?
+* Large file streaming from proxy server to client could be made concurrent by fork
+* Or concurrent operations to be ordered by a queue maintained in the proxy server parent process, and operations apply orderly?
 
 ### Proxy Server State Transition
 1. accept client connection
@@ -69,14 +75,17 @@ If cache miss, then execute step 3-6
 ```c
 int main(){
     listen_fd = server_init();
-    read_fds = []
-    write_fds = []
+    client_fds = []
+    server_fd
+
     while(1){
-        if(select()<=0){
+        if(select()<=0){ //nothing interesting happens
             continue;
         }
-        if(isset(listen_fd)){
+        if(isset(listen_fd)){ // new incoming connection from client
             client_fd = accept_client(listen_fd);
+        }
+        for(client_fd in ){
 
         }
     }

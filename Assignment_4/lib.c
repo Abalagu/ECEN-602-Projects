@@ -98,7 +98,7 @@ http_err_t accept_client(int listen_fd, int *client_fd) {
   char str[sin_size];
   *client_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
 
-  if(*client_fd <0){
+  if (*client_fd < 0) {
     perror("accept_client");
     return HTTP_FAIL;
   }
@@ -151,11 +151,15 @@ http_err_t server_init(char *port, int *sockfd) {
   return HTTP_OK;
 }
 
-
-
 void sigchld_handler(int s) {
-    // waitpid() might overwrite errno, so we save and restore it:
-    int saved_errno = errno;
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-    errno = saved_errno;
+  // waitpid() might overwrite errno, so we save and restore it:
+  int saved_errno = errno;
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    ;
+  errno = saved_errno;
 }
+
+typedef struct document_node_t {
+  struct document_node_t *prev, *next;
+  
+} document_node_t;

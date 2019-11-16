@@ -241,16 +241,22 @@ void parse_response(char res_buf[1500], response_t *res) {
   }
 }
 
-cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next) {
+cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
+                             size_t buffer_size) {
   cache_node_t *cache_node = malloc(sizeof(cache_node_t));
   // designated initializer in C99
   // https://stackoverflow.com/questions/7265583/combine-designated-initializers-and-malloc-in-c99
   *cache_node = (cache_node_t){
-      .buffer_size = 0,
-      .buffer = NULL,
       .prev = prev,
       .next = next,
+      .buffer = NULL,
+      .buffer_size = buffer_size,
+      .status = NOT_IN_USE,
   };
+  if (buffer_size != 0) {
+    // use calloc instead of malloc to both allocate and init to 0
+    cache_node->buffer = calloc(buffer_size, sizeof(char));
+  }
   return cache_node;
 }
 
@@ -258,41 +264,96 @@ cache_queue_t *new_cache_queue(size_t max_slot) {
   cache_queue_t *cache_queue = malloc(sizeof(cache_queue_t));
   *cache_queue = (cache_queue_t){
       .max_slot = max_slot,
-      .front = new_cache_node(NULL, NULL), // create a node for head
+      .front = new_cache_node(NULL, NULL, 0), // create a node for head
       .rear = NULL,
   };
-  cache_node_t *prev_node = cache_queue->front, *new_node = NULL;
 
+  cache_node_t *prev_node = cache_queue->front, *new_node = NULL;
   for (int i = 0; i < max_slot - 1; i++) { // one created during queue init
-    new_node = new_cache_node(prev_node, NULL);
+    new_node = new_cache_node(prev_node, NULL, 0);
     if (new_node->prev != NULL) {
       // link .next field of the previous node to itself.
       new_node->prev->next = new_node;
     }
     prev_node = new_node; // becomes the prev node in the next loop
   }
+  cache_queue->rear = new_node;
 
   return cache_queue;
 }
 
 void free_cache_node(cache_node_t **cache_node) {
+  if (*cache_node == NULL) { // avoid double free
+    return;
+  }
   // to set pointer to NULL, one would need to pass pointer of the pointer
-  free((*cache_node)->buffer);
-  (*cache_node)->buffer = NULL;
+  if ((*cache_node)->buffer != NULL) {
+    free((*cache_node)->buffer);
+    (*cache_node)->buffer = NULL;
+  }
   free((*cache_node));
   *cache_node = NULL;
+  return;
 }
 
 void free_cache_queue(cache_queue_t **cache_queue) {
+  if (*cache_queue == NULL) { // avoid double free
+    return;
+  }
   cache_node_t *cache_node = (*cache_queue)->front, *next = NULL;
-  int count = 0;
   while (cache_node != NULL) {
     next = cache_node->next; // temp store next node before memory free
     free_cache_node(&cache_node);
     cache_node = next;
-    count += 1;
-    printf("free node %d\n", count);
   }
   free(*cache_queue);
   *cache_queue = NULL;
+  return;
+}
+
+void print_cache_node(cache_node_t *cache_node) {
+  printf("buffer size: %ld ", cache_node->buffer_size);
+  printf("buffer: %s ", cache_node->buffer == NULL ? "NULL" : "NOT NULL");
+  printf("status: %d ", cache_node->status);
+  printf("prev: %s ", cache_node->prev == NULL ? "NULL" : "NOT NULL");
+  printf("next: %s\n", cache_node->next == NULL ? "NULL" : "NOT NULL");
+  return;
+}
+
+void print_cache_queue(cache_queue_t *cache_queue) {
+  if (cache_queue == NULL) {
+    printf("cache queue is NULL\n");
+    return;
+  }
+  cache_node_t *cache_node = cache_queue->front;
+  while (cache_node != NULL) {
+    print_cache_node(cache_node);
+    cache_node = cache_node->next;
+  }
+  return;
+}
+
+// evict the last node of the queue, not exposed
+void cache_dequeue(cache_queue_t *cache_queue) {
+  // store the last but one node
+  cache_node_t *tmp_node = cache_queue->rear->prev;
+  cache_queue->rear->prev = NULL; // evicted, null its prev and next
+  cache_queue->rear->next = NULL; // by default rear.next is NULL
+  // if NOT_IN_USE, free the memory
+  if (cache_queue->rear->status == NOT_IN_USE) {
+    free_cache_node(&cache_queue->rear);
+  }
+  // if IN_USE, let the using process free its memory
+  cache_queue->rear = tmp_node; // the last but one becomes the last node
+  cache_queue->rear->next = NULL;
+  return;
+}
+
+// always dequeue before enqueue, thus maintain a constant queue size
+void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node) {
+  cache_dequeue(cache_queue);
+  new_node->next = cache_queue->front;
+  new_node->prev = NULL;
+  cache_queue->front = new_node;
+  return;
 }

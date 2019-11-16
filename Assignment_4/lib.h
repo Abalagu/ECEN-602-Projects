@@ -28,7 +28,7 @@ typedef struct {
 // --- BEGIN LRU CACHE MANAGEMENT ---
 typedef enum node_status_t {
   IN_USE = 1,
-  VACANT = 2,
+  NOT_IN_USE = 2,
 } node_status_t;
 
 typedef struct cache_node_t {
@@ -43,13 +43,20 @@ typedef struct cache_queue_t {
   cache_node_t *front, *rear;
 } cache_queue_t;
 
-cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next);
+cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next, size_t buffer_size);
 
 cache_queue_t *new_cache_queue(size_t max_slot);
 
 void free_cache_node(cache_node_t **cache_node);
 
 void free_cache_queue(cache_queue_t **cache_queue);
+
+void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node);
+
+void print_cache_node(cache_node_t *cache_node);
+
+void print_cache_queue(cache_queue_t *cache_queue);
+
 // --- END LRU CACHE MANAGEMENT
 
 // --- BEGIN FD MANAGEMENT ---

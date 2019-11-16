@@ -44,7 +44,7 @@
 
 #### Proposed solution: 
 
-* Add an IN_USE flag to the structure holding the document. If it's not IN_USE, evict the document with memory release. Otherwise, leave memory release to the undergoing process that's using it.
+* Add an IN_USE flag to the structure holding the document. If it's not IN_USE, evict the document with memory release. Otherwise, evict it but leave memory release to the process using it.
 
   + The LRU document can be evicted without causing any problems, even if its in use, as cache only holds the address of the struct that stores the actual document, which can be associated with the socket fd that's using it.
 
@@ -97,7 +97,60 @@
 
 	2. add new document
 
+## File Descriptor Management
+
+1. associate fd with a char array pointer, to be allocated 
+2. associate a node outside LRU cache to each server_fd or client_fd, read to/write from the buffer in the node.  Append node to the cache list only if complete saved
+3. regard buffer in the node as RX/TX buffer, which is an overload of functionality.  Detach node or buffer address from client_fd after transmission complete.  
+4. should add an offset field to denote partial read/write progress and help check read/write EOF
+5. add a status field to denote the undergoing status, either read or write
+
 ## Pseudocode
+
+### File descriptor struct
+
+``` c
+typedef enum fd_type_t {
+    LISTEN = 1,
+    CLIENT = 2,
+    SERVER = 3,
+} fd_type_t;
+
+typedef struct fd_node_t{
+    int fd;
+    fd_type_t type;
+    cache_node_t *node; // hold buffer, document
+    fd_node_t *prev, *next;
+} fd_node_t;
+
+// max fd nodes at any time: 7 (listen + client + server = 1 + 3 + 3)
+// default front as listening node
+typedef struct fd_queue_t {
+    fd_node_t *front;
+    int client_count; // max client: 3
+} fd_queue_t;
+```
+
+### LRU Cache struct
+
+``` c
+typedef enum node_status_t{
+    IN_USE = 1,
+    VACANT = 2,
+} node_status_t;
+
+typedef struct cache_node_t{
+    cache_node_t *prev, *next;
+    char *buffer; // RX TX buffer, or document buffer
+    size_t buffer_size;
+    node_status_t status;
+} cache_node_t;
+
+typedef struct cache_queue_t{
+    int num_of_frame; // max frame count
+    node_t *front, *rear;
+} cache_queue_t;
+```
 
 ### HTTP Client
 

@@ -25,6 +25,45 @@ typedef struct {
   // etc, etc
 } response_t;
 
+// --- BEGIN FD MANAGEMENT ---
+typedef enum fd_type_t {
+  LISTEN = 1,
+  CLIENT = 2,
+  SERVER = 3,
+} fd_type_t;
+
+typedef struct fd_node_t {
+  fd_node_t *prev, *next;
+  int fd;
+  fd_type_t type;
+  cache_node_t *node;
+} fd_node_t;
+
+typedef struct fd_queue_t {
+  fd_node_t *front;
+  int client_count;
+} fd_queue_t;
+// --- END FD MANAGEMENT ---
+
+// --- BEGIN LRU CACHE MANAGEMENT ---
+typedef enum node_status_t {
+  IN_USE = 1,
+  VACANT = 2,
+} node_status_t;
+
+typedef struct cache_node_t {
+  cache_node_t *prev, *next;
+  char *buffer;
+  size_t buffer_size;
+  node_status_t status;
+} cache_node_t;
+
+typedef struct cache_queue_t {
+  int num_of_frame;
+  cache_node_t *front, *rear;
+} cache_queue_t;
+// --- END LRU CACHE MANAGEMENT
+
 http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd);
 
 int written(int sockfd, char *buf, size_t size_buf);

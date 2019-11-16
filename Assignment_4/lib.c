@@ -63,7 +63,7 @@ http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd) {
   return HTTP_OK;
 }
 
-int writen(int sockfd, char *buf, size_t size_buf) {
+int written(int sockfd, char *buf, size_t size_buf) {
   int numbytes;
   while ((numbytes = send(sockfd, buf, size_buf, 0)) == -1 && errno == EINTR) {
     // manually restarting
@@ -98,7 +98,7 @@ http_err_t accept_client(int listen_fd, int *client_fd) {
   char str[sin_size];
   *client_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
 
-  if (*client_fd < 0) {
+  if(*client_fd <0){
     perror("accept_client");
     return HTTP_FAIL;
   }
@@ -151,15 +151,94 @@ http_err_t server_init(char *port, int *sockfd) {
   return HTTP_OK;
 }
 
+
+
 void sigchld_handler(int s) {
-  // waitpid() might overwrite errno, so we save and restore it:
-  int saved_errno = errno;
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
-  errno = saved_errno;
+    // waitpid() might overwrite errno, so we save and restore it:
+    int saved_errno = errno;
+    while(waitpid(-1, NULL, WNOHANG) > 0);
+    errno = saved_errno;
 }
 
-typedef struct document_node_t {
-  struct document_node_t *prev, *next;
+
+void parse_request(char req_buf[1500], request_t *req) {
+	// char url[1500]= "GET /somefile HTTP/1.0\r\nHost: www.go.com\r\nUser-Agent: Team4\r\n\r\n";
+	// fix size
+  char buf[1500] = {0};
+
+  // separate the first line which contains the path
+  char *loc = strchr(req_buf, '\r');
+  int pos = (loc == NULL ? -1 : loc - req_buf);
   
-} document_node_t;
+  // First 4 and last 13 contain standard HTTP version info, not needed
+  int _pos = pos - 13;
+  strncpy(req->path, &req_buf[4], _pos);
+
+	// rest of the header
+  memcpy(buf, &(req_buf[pos+2]), 1500*sizeof(char));
+
+  char* token;
+  char* _buf = buf;
+  char* key = malloc(strlen(buf));
+  char* value = malloc(strlen(buf));
+
+	// \r\n is the delim here according to spec
+  while((token = strtok_r(_buf, "\r\n", &_buf))) {
+    // printf("token:%s\n", token);
+    loc = strchr(token, ' ');
+    pos = (loc == NULL ? -1 : loc - token);
+    
+    strncpy(key, token, pos);
+    strncpy(value, &(token[pos+1]), strlen(token));
+    
+    if (!strcmp(key, "Host:")) {
+      strcpy(req->host, value);
+    } else if (!strcmp(key, "User-Agent:")) {
+      strcpy(req->user_agent, value);
+    } else if (!strcmp(key, "Connection:")) {
+			strcpy(req->connection, value);
+		}
+  }
+}
+
+void parse_response(char res_buf[1500], response_t *res) {
+	char buf[1500] = {0};
+	
+	char *loc = strchr(res_buf, '\r');
+  int pos = (loc == NULL ? -1 : loc - res_buf);
+
+	// status code does not begin until 9
+	memcpy(res->status, &(res_buf[9]), pos-9);
+
+	// copy rest of the buffer
+  memcpy(buf, &(res_buf[pos+2]), 1500*sizeof(char));
+	if (DEBUG)
+  	printf("buf:%s\n", buf);
+
+  char* token;
+  char* _buf = buf;
+  char* key = malloc(strlen(buf));
+  char* value = malloc(strlen(buf));
+
+	// the delim is \r\n
+  while((token = strtok_r(_buf, "\r\n", &_buf))) {
+    // printf("token:%s\n", token);
+    loc = strchr(token, ' ');
+    pos = (loc == NULL ? -1 : loc - token);
+
+    if (pos < 0) {
+			// EOF
+        break;
+    }
+
+    strncpy(key, token, pos);
+    strncpy(value, &(token[pos+1]), strlen(token));
+    
+    if (!strcmp(key, "Content-Length:")) {
+      strcpy(res->content_length, value);
+    } else if (!strcmp(key, "Date:")) {
+      strcpy(res->date, value);
+    }
+		// add more fields which we are interested in
+  }
+}

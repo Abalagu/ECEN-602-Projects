@@ -98,7 +98,7 @@ http_err_t accept_client(int listen_fd, int *client_fd) {
   char str[sin_size];
   *client_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
 
-  if(*client_fd <0){
+  if (*client_fd < 0) {
     perror("accept_client");
     return HTTP_FAIL;
   }
@@ -151,94 +151,148 @@ http_err_t server_init(char *port, int *sockfd) {
   return HTTP_OK;
 }
 
-
-
 void sigchld_handler(int s) {
-    // waitpid() might overwrite errno, so we save and restore it:
-    int saved_errno = errno;
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-    errno = saved_errno;
+  // waitpid() might overwrite errno, so we save and restore it:
+  int saved_errno = errno;
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    ;
+  errno = saved_errno;
 }
 
-
 void parse_request(char req_buf[1500], request_t *req) {
-	// char url[1500]= "GET /somefile HTTP/1.0\r\nHost: www.go.com\r\nUser-Agent: Team4\r\n\r\n";
-	// fix size
+  // char url[1500]= "GET /somefile HTTP/1.0\r\nHost: www.go.com\r\nUser-Agent:
+  // Team4\r\n\r\n"; fix size
   char buf[1500] = {0};
 
   // separate the first line which contains the path
   char *loc = strchr(req_buf, '\r');
   int pos = (loc == NULL ? -1 : loc - req_buf);
-  
+
   // First 4 and last 13 contain standard HTTP version info, not needed
   int _pos = pos - 13;
   strncpy(req->path, &req_buf[4], _pos);
 
-	// rest of the header
-  memcpy(buf, &(req_buf[pos+2]), 1500*sizeof(char));
+  // rest of the header
+  memcpy(buf, &(req_buf[pos + 2]), 1500 * sizeof(char));
 
-  char* token;
-  char* _buf = buf;
-  char* key = malloc(strlen(buf));
-  char* value = malloc(strlen(buf));
+  char *token;
+  char *_buf = buf;
+  char *key = malloc(strlen(buf));
+  char *value = malloc(strlen(buf));
 
-	// \r\n is the delim here according to spec
-  while((token = strtok_r(_buf, "\r\n", &_buf))) {
+  // \r\n is the delim here according to spec
+  while ((token = strtok_r(_buf, "\r\n", &_buf))) {
     // printf("token:%s\n", token);
     loc = strchr(token, ' ');
     pos = (loc == NULL ? -1 : loc - token);
-    
+
     strncpy(key, token, pos);
-    strncpy(value, &(token[pos+1]), strlen(token));
-    
+    strncpy(value, &(token[pos + 1]), strlen(token));
+
     if (!strcmp(key, "Host:")) {
       strcpy(req->host, value);
     } else if (!strcmp(key, "User-Agent:")) {
       strcpy(req->user_agent, value);
     } else if (!strcmp(key, "Connection:")) {
-			strcpy(req->connection, value);
-		}
+      strcpy(req->connection, value);
+    }
   }
 }
 
 void parse_response(char res_buf[1500], response_t *res) {
-	char buf[1500] = {0};
-	
-	char *loc = strchr(res_buf, '\r');
+  char buf[1500] = {0};
+
+  char *loc = strchr(res_buf, '\r');
   int pos = (loc == NULL ? -1 : loc - res_buf);
 
-	// status code does not begin until 9
-	memcpy(res->status, &(res_buf[9]), pos-9);
+  // status code does not begin until 9
+  memcpy(res->status, &(res_buf[9]), pos - 9);
 
-	// copy rest of the buffer
-  memcpy(buf, &(res_buf[pos+2]), 1500*sizeof(char));
-	if (DEBUG)
-  	printf("buf:%s\n", buf);
+  // copy rest of the buffer
+  memcpy(buf, &(res_buf[pos + 2]), 1500 * sizeof(char));
+  if (DEBUG)
+    printf("buf:%s\n", buf);
 
-  char* token;
-  char* _buf = buf;
-  char* key = malloc(strlen(buf));
-  char* value = malloc(strlen(buf));
+  char *token;
+  char *_buf = buf;
+  char *key = malloc(strlen(buf));
+  char *value = malloc(strlen(buf));
 
-	// the delim is \r\n
-  while((token = strtok_r(_buf, "\r\n", &_buf))) {
+  // the delim is \r\n
+  while ((token = strtok_r(_buf, "\r\n", &_buf))) {
     // printf("token:%s\n", token);
     loc = strchr(token, ' ');
     pos = (loc == NULL ? -1 : loc - token);
 
     if (pos < 0) {
-			// EOF
-        break;
+      // EOF
+      break;
     }
 
     strncpy(key, token, pos);
-    strncpy(value, &(token[pos+1]), strlen(token));
-    
+    strncpy(value, &(token[pos + 1]), strlen(token));
+
     if (!strcmp(key, "Content-Length:")) {
       strcpy(res->content_length, value);
     } else if (!strcmp(key, "Date:")) {
       strcpy(res->date, value);
     }
-		// add more fields which we are interested in
+    // add more fields which we are interested in
   }
+}
+
+cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next) {
+  cache_node_t *cache_node = malloc(sizeof(cache_node_t));
+  // designated initializer in C99
+  // https://stackoverflow.com/questions/7265583/combine-designated-initializers-and-malloc-in-c99
+  *cache_node = (cache_node_t){
+      .buffer_size = 0,
+      .buffer = NULL,
+      .prev = prev,
+      .next = next,
+  };
+  return cache_node;
+}
+
+cache_queue_t *new_cache_queue(size_t max_slot) {
+  cache_queue_t *cache_queue = malloc(sizeof(cache_queue_t));
+  *cache_queue = (cache_queue_t){
+      .max_slot = max_slot,
+      .front = new_cache_node(NULL, NULL), // create a node for head
+      .rear = NULL,
+  };
+  cache_node_t *prev_node = cache_queue->front, *new_node = NULL;
+
+  for (int i = 0; i < max_slot - 1; i++) { // one created during queue init
+    new_node = new_cache_node(prev_node, NULL);
+    if (new_node->prev != NULL) {
+      // link .next field of the previous node to itself.
+      new_node->prev->next = new_node;
+    }
+    prev_node = new_node; // becomes the prev node in the next loop
+  }
+
+  return cache_queue;
+}
+
+void free_cache_node(cache_node_t **cache_node) {
+  // to set pointer to NULL, one would need to pass pointer of the pointer
+  free((*cache_node)->buffer);
+  (*cache_node)->buffer = NULL;
+  free((*cache_node));
+  *cache_node = NULL;
+}
+
+void free_cache_queue(cache_queue_t **cache_queue) {
+  cache_node_t *cache_node = (*cache_queue)->front, *next = NULL;
+  int count = 0;
+  while (cache_node != NULL) {
+    next = cache_node->next; // temp store next node before memory free
+    free_cache_node(&cache_node);
+    cache_node = next;
+    count += 1;
+    printf("free node %d\n", count);
+  }
+  free(*cache_queue);
+  *cache_queue = NULL;
 }

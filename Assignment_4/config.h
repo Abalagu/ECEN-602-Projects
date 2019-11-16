@@ -6,5 +6,6 @@
 #define PROXY_PORT "4950"
 #define MAX_DATA_SIZE 1500
 #define BACKLOG 10
-
+#define DEBUG 0
+#define LRU_MAX_SLOT 10
 #endif

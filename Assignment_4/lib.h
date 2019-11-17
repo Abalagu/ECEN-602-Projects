@@ -68,7 +68,6 @@ typedef struct fd_list_t {
   int max_client;
 } fd_list_t;
 
-
 fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
                        node_status_t status, cache_node_t *cache_node);
 
@@ -101,7 +100,6 @@ http_err_t accept_client(int listen_fd, int *client_fd);
 
 http_err_t server_init(char *port, int *sockfd);
 
-// --- END SOCKET UTIL ---
 int get_max_fd(fd_list_t *fd_list);
 
 int fd_select(fd_list_t *fd_list, fd_set *read_fds, fd_set *write_fds);
@@ -109,4 +107,13 @@ int fd_select(fd_list_t *fd_list, fd_set *read_fds, fd_set *write_fds);
 int cache_recv(fd_node_t *fd_node);
 
 int cache_send(fd_node_t *fd_node);
+// --- END SOCKET UTIL ---
+
+// --- BEGIN UNIT TEST FUNCTIONS ---
+void cache_init_test();
+void cache_enqueue_test();
+void cache_eviction_test();
+void fd_list_test();
+// --- END UNIT TEST FUNCTIONS ---
+
 #endif

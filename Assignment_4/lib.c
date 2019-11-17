@@ -455,7 +455,6 @@ int cache_send(fd_node_t *fd_node) {
 }
 // --- END SOCKET UTIL ---
 
-
 // --- BEGIN UNIT TEST FUNCTIONS ---
 void cache_init_test() {
   printf("\ncache init test\n");
@@ -523,5 +522,78 @@ void fd_list_test() {
   print_fd_list(fd_list);
   printf("max fd: %d\n", get_max_fd(fd_list));
   return;
+}
+
+http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
+  fd_node_t *server_node, *tmp_node;
+  int server_fd;
+  cache_recv(fd_node);
+  if (fd_node->status == IDLE) { // read complete, start parsing
+    // printf("%s\n", fd_node->cache_node->buffer);
+    // TODO: add parsing from http request
+    if (server_lookup_connect("www.wikipedia.org", "80", &server_fd) !=
+        HTTP_OK) {
+      // TODO: handle connection error
+      tmp_node = fd_node->next;
+      fd_list_remove(fd_node);
+      printf("connection failed.  fd cleanup\n");
+    } else {
+      server_node = new_fd_node(NULL, NULL, server_fd, SERVER, WRITING,
+                                fd_node->cache_node);
+      // bind server_node with client_node
+      server_node->proxied = fd_node;
+      fd_node->proxied = server_node;
+      // serve after the next select call
+      fd_list_append(fd_list, server_node);
+    }
+  } else { // partially read request
+    ;
+  }
+  // client read complete
+  return HTTP_OK;
+}
+
+http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
+  int client_fd;
+  fd_node_t *client_node;
+  if (accept_client(fd_node->fd, &client_fd) != HTTP_OK) {
+    return HTTP_FAIL;
+  }
+  client_node = new_fd_node(NULL, NULL, client_fd, CLIENT, READING,
+                            new_cache_node(NULL, NULL, INITIAL_BUFFER));
+  fd_list_append(fd_list, client_node);
+  // print_fd_list(fd_list);
+  printf("client accepted.\n");
+  return HTTP_OK;
+}
+
+http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
+  // send http response to client
+  printf("CLIENT WRITE NOT IMPLEMENTED\n");
+  return HTTP_OK;
+}
+
+http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
+  fd_node_t *tmp_node;
+  // read http response from server
+  printf("reading from server\n");
+  cache_recv(fd_node);
+  if (fd_node->status == IDLE) {        // received full response
+    fd_node->proxied->status = WRITING; // start writing to client
+    tmp_node = fd_node->next;
+    fd_list_remove(fd_node); // remove from select list
+    free_fd_node(&fd_node);
+  }
+  return HTTP_OK;
+}
+
+http_err_t server_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
+  // write http request to server
+  printf("writing to server\n");
+  cache_send(fd_node);
+  if (fd_node->status == IDLE) { // send complete
+    fd_node->status = READING;   // waiting for server response
+  }
+  return HTTP_OK;
 }
 // --- END UNIT TEST FUNCTIONS ---

@@ -107,6 +107,12 @@ int fd_select(fd_list_t *fd_list, fd_set *read_fds, fd_set *write_fds);
 int cache_recv(fd_node_t *fd_node);
 
 int cache_send(fd_node_t *fd_node);
+
+http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t server_write_handler(fd_list_t *fd_list, fd_node_t *fd_node);
 // --- END SOCKET UTIL ---
 
 // --- BEGIN UNIT TEST FUNCTIONS ---

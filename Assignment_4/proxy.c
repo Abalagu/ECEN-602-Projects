@@ -1,6 +1,5 @@
 #include "headers.h"
 
-
 http_err_t main(int argc, char *argv[]) {
   if (argc != 3) {
     printf("usage: ./proxy <ip to bind> <port to bind>\n");
@@ -16,7 +15,7 @@ http_err_t main(int argc, char *argv[]) {
   int listen_fd;
   int retval;
   int client_fd, server_fd;
-  fd_node_t *client_node, *server_node;
+  fd_node_t *client_node, *server_node, *tmp_node;
   fd_set read_fds, write_fds;
 
   fd_list_t *fd_list = new_fd_list(PROXY_MAX_CLIENT);
@@ -28,6 +27,7 @@ http_err_t main(int argc, char *argv[]) {
       new_fd_node(NULL, NULL, listen_fd, LISTEN, READING, NULL);
 
   fd_list_append(fd_list, fd_node);
+
   while (1) {
     retval = fd_select(fd_list, &read_fds, &write_fds);
     if (retval == 0) {
@@ -42,65 +42,63 @@ http_err_t main(int argc, char *argv[]) {
     fd_node = fd_list->front;
     while (fd_node != NULL) {
       if (fd_node->type == DUMMY) {
-        ;
-      }
-      if (fd_node->type == LISTEN && FD_ISSET(fd_node->fd, &read_fds)) {
-        if (accept_client(fd_node->fd, &client_fd) != HTTP_OK) {
-          return HTTP_FAIL;
-        }
-        client_node = new_fd_node(NULL, NULL, client_fd, CLIENT, READING,
-                                  new_cache_node(NULL, NULL, INITIAL_BUFFER));
-        fd_list_append(fd_list, client_node);
-        // print_fd_list(fd_list);
-        printf("client accepted.\n");
-      } // client accepted
+        fd_node = fd_node->next;
+        continue;
+      } // skip dummy node
 
-      if (fd_node->type == CLIENT) {
-        // read http request from client
-        if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
-          cache_recv(fd_node);
-          if (fd_node->status == IDLE) { // read complete, start parsing
-            printf("%s\n", fd_node->cache_node->buffer);
-            // TODO: add parsing from http request
-            if (server_lookup_connect("www.wikipedia.org", "80", &server_fd) !=
-                HTTP_OK) {
-              // TODO: handle connection error
-              fd_list_remove(fd_node);
-              printf("connection failed.  fd cleanup\n");
-            } else {
-              server_node = new_fd_node(NULL, NULL, server_fd, SERVER, WRITING,
-                                        fd_node->cache_node);
-              // serve after the next select call
-              server_node->proxied = fd_node;
-              fd_node->proxied = server_node;
-              fd_list_append(fd_list, server_node);
-            };
-          }
-        } else if (fd_node->status == WRITING &&
-                   FD_ISSET(fd_node->fd,
-                            &write_fds)) { // send http response to client
-          printf("CLIENT WRITE NOT IMPLEMENTED\n");
+      // accept new connection
+      if (fd_node->type == LISTEN) {
+        if (FD_ISSET(fd_node->fd, &read_fds)) {
+          tmp_node = fd_node->next;
+          listen_fd_handler(fd_list, fd_node);
+          fd_node = tmp_node;
+        } else { // no incoming connection
+          fd_node = fd_node->next;
         }
+        continue;
+      }
+
+      // read http request from client
+      if (fd_node->type == CLIENT) {
+        if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
+          tmp_node = fd_node->next;
+          client_read_handler(fd_list, fd_node);
+          fd_node = tmp_node;
+        }
+        // send http response
+        else if (fd_node->status == WRITING &&
+                 FD_ISSET(fd_node->fd, &write_fds)) {
+          tmp_node = fd_node->next;
+          client_write_handler(fd_list, fd_node);
+        } else { // fd not set
+          fd_node = fd_node->next;
+        }
+        continue;
       }
 
       if (fd_node->type == SERVER) {
         if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
-          // read http response from server
-          printf("SERVER READ NOT IMPLEMENTED\n");
-        } else if (fd_node->status == WRITING &&
-                   FD_ISSET(fd_node->fd, &write_fds)) {
-          // write http request to server
-          printf("writing to server\n");
-          cache_send(fd_node);
-          if (fd_node->status == IDLE) { // send complete
-            fd_node->status = READING;   // waiting for server response
-          }
-        }
+          tmp_node = fd_node->next;
+          server_read_handler(fd_list, fd_node);
+          fd_node = tmp_node;
+        } // http response read complete
+        else if (fd_node->status == WRITING &&
+                 FD_ISSET(fd_node->fd, &write_fds)) {
+          tmp_node = fd_node->next;
+          server_write_handler(fd_list, fd_node);
+          fd_node = tmp_node;
+        } // http request send complete
+        continue;
+      } else {
+        // nothing matched, current fd not set, go to next node
+        fd_node = fd_node->next;
+        continue;
       }
-      fd_node = fd_node->next;
     } // end node traversal
+
     printf("  end of fd node traversal\n");
   } // end service loop
+
   close(listen_fd);
   return HTTP_OK;
 }

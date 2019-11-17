@@ -346,12 +346,14 @@ void cache_dequeue(cache_queue_t *cache_queue) {
   // if IN_USE, let the using process free its memory
   cache_queue->rear = tmp_node; // the last but one becomes the last node
   cache_queue->rear->next = NULL;
+
   return;
 }
 
 // always dequeue before enqueue, thus maintain a constant queue size
 void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node) {
   cache_dequeue(cache_queue);
+  cache_queue->front->prev = new_node;
   new_node->next = cache_queue->front;
   new_node->prev = NULL;
   cache_queue->front = new_node;

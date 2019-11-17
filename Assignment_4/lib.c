@@ -63,24 +63,6 @@ http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd) {
   return HTTP_OK;
 }
 
-int written(int sockfd, char *buf, size_t size_buf) {
-  int numbytes;
-  while ((numbytes = send(sockfd, buf, size_buf, 0)) == -1 && errno == EINTR) {
-    // manually restarting
-    continue;
-  }
-  return numbytes;
-}
-
-int readline(int sockfd, char *recvbuf) {
-  int numbytes;
-  while ((numbytes = recv(sockfd, recvbuf, MAX_DATA_SIZE - 1, 0)) == -1 &&
-         errno == EINTR) {
-    // manually restarting
-  }
-  return numbytes;
-}
-
 // print buffer of given length in hexadecimal form, prefix with 0
 void print_hex(void *array, size_t len) {
   char *parray = array;
@@ -279,10 +261,12 @@ fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
   *new_node = (fd_node_t){
       .prev = prev,
       .next = next,
+      .proxied = NULL, // associate client and server nodes
       .fd = fd,
       .type = type,
       .status = status,
       .cache_node = cache_node,
+      .offset = 0,
   };
   return new_node;
 }
@@ -341,12 +325,13 @@ void fd_list_remove(fd_node_t *fd_node) {
 }
 
 void print_fd_node(fd_node_t *fd_node) {
-  printf("prev: %s ", fd_node->prev == NULL ? "NULL" : "NOT");
-  printf("next: %s ", fd_node->next == NULL ? "NULL" : "NOT");
+  printf("prev: %s ", fd_node->prev == NULL ? "NULL" : "NOTN");
+  printf("next: %s ", fd_node->next == NULL ? "NULL" : "NOTN");
   printf("fd: %d ", fd_node->fd);
   printf("type: %d ", fd_node->type);
   printf("status: %d ", fd_node->status);
-  printf("cache node: %s\n", fd_node->cache_node == NULL ? "NULL" : "NOT");
+  printf("cache node: %s ", fd_node->cache_node == NULL ? "NULL" : "NOTN");
+  printf("offset: %ld\n", fd_node->offset);
   return;
 }
 
@@ -380,22 +365,92 @@ int get_max_fd(fd_list_t *fd_list) {
 }
 
 // select call based on fd status, pass select retval to outside
-int fd_select(fd_list_t *fd_list) {
+int fd_select(fd_list_t *fd_list, fd_set *read_fds, fd_set *write_fds) {
   struct timeval tv;
-  fd_set read_fds, write_fds;
   tv.tv_sec = 2;
   tv.tv_usec = 0;
-  FD_ZERO(&read_fds);
-  FD_ZERO(&write_fds);
+  FD_ZERO(read_fds);
+  FD_ZERO(write_fds);
   fd_node_t *node = fd_list->front;
   while (node != NULL) {
     if (node->status == READING) {
-      FD_SET(node->fd, &read_fds);
+      FD_SET(node->fd, read_fds);
     } else if (node->status == WRITING) {
-      FD_SET(node->fd, &write_fds);
+      FD_SET(node->fd, write_fds);
     }
     node = node->next;
   }
-  return select(get_max_fd(fd_list) + 1, &read_fds, &write_fds, NULL, &tv);
+  return select(get_max_fd(fd_list) + 1, read_fds, write_fds, NULL, &tv);
+}
+
+int written(int sockfd, char *buf, size_t size_buf) {
+  int numbytes;
+  while ((numbytes = send(sockfd, buf, size_buf, 0)) == -1 && errno == EINTR) {
+    // manually restarting
+    continue;
+  }
+  return numbytes;
+}
+
+int readline(int sockfd, char *recvbuf, size_t read_size) {
+  int numbytes;
+  while ((numbytes = recv(sockfd, recvbuf, read_size, 0)) == -1 &&
+         errno == EINTR) {
+    // manually restarting
+  }
+  return numbytes;
+}
+
+// read to recvbuf, with specified offset
+int cache_recv(fd_node_t *fd_node) {
+  int numbytes;
+  char buf_recv[MAX_DATA_SIZE] = {0};
+  while ((numbytes = recv(fd_node->fd, buf_recv, MAX_DATA_SIZE, 0)) == -1 &&
+         errno == EINTR) {
+    // manually restarting
+  }
+  // reallocate for cache node buffer if exceeds free space
+  if (fd_node->cache_node->buffer_size - fd_node->offset <= numbytes) {
+    fd_node->cache_node->buffer =
+        realloc(fd_node->cache_node->buffer,
+                fd_node->cache_node->buffer_size + MAX_DATA_SIZE);
+    fd_node->cache_node->buffer_size += MAX_DATA_SIZE;
+  }
+
+  // copy recv to cache_node, increment offset
+  memcpy(fd_node->cache_node->buffer + fd_node->offset, buf_recv, numbytes);
+  fd_node->offset += numbytes;
+
+  // change fd_node status if recv complete
+  if (numbytes < MAX_DATA_SIZE) {
+    fd_node->status = IDLE;
+    fd_node->offset = 0; // reset offset to head
+  }
+
+  return numbytes;
+}
+
+int cache_send(fd_node_t *fd_node) {
+  int numbytes;
+  int remain_size = fd_node->cache_node->buffer_size - fd_node->offset;
+  // send at most MAX_DATA_SIZE in one go
+  int send_size = remain_size > MAX_DATA_SIZE ? MAX_DATA_SIZE : remain_size;
+
+  while ((numbytes = send(fd_node->fd, fd_node->cache_node->buffer, send_size,
+                          0)) == -1 &&
+         errno == EINTR) {
+    // manually restarting
+    continue;
+  }
+  // record offset by actual sent amount
+  fd_node->offset += numbytes;
+  // if send complete, reset offset to 0
+  if (fd_node->offset >= fd_node->cache_node->buffer_size) {
+    printf("offset: %ld, size: %ld", fd_node->offset,
+           fd_node->cache_node->buffer_size);
+    fd_node->status = IDLE;
+    fd_node->offset = 0;
+  }
+  return numbytes;
 }
 // --- END SOCKET UTIL ---

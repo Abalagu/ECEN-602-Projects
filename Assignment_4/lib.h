@@ -10,7 +10,7 @@ typedef enum http_err_t {
 
 typedef enum node_status_t {
   IN_USE = 1,  // for lru cache
-  IDLE = 2,    // for lru cache
+  IDLE = 2,    // for lru cache // indicate operation complete
   READING = 3, // for socket select
   WRITING = 4, // for socket select
 } node_status_t;
@@ -55,17 +55,19 @@ typedef enum fd_type_t {
 } fd_type_t;
 
 typedef struct fd_node_t {
-  struct fd_node_t *prev, *next;
+  struct fd_node_t *prev, *next, *proxied;
   int fd;
   fd_type_t type;
   node_status_t status;
   cache_node_t *cache_node;
+  off_t offset; // record partial read/write progress
 } fd_node_t;
 
 typedef struct fd_list_t {
   fd_node_t *front, *rear;
   int max_client;
 } fd_list_t;
+
 
 fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
                        node_status_t status, cache_node_t *cache_node);
@@ -78,11 +80,11 @@ void fd_list_remove(fd_node_t *fd_node);
 
 void free_fd_node(fd_node_t **fd_node);
 
-void free_fd_list(fd_list_t **fd_queue);
+void free_fd_list(fd_list_t **fd_list);
 
 void print_fd_node(fd_node_t *fd_node);
 
-void print_fd_list(fd_list_t *fd_queue);
+void print_fd_list(fd_list_t *fd_list);
 
 // --- END FD MANAGEMENT ---
 
@@ -91,7 +93,7 @@ http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd);
 
 int written(int sockfd, char *buf, size_t size_buf);
 
-int readline(int sockfd, char *recvbuf);
+int readline(int sockfd, char *recvbuf, size_t read_size);
 
 void print_hex(void *array, size_t len);
 
@@ -102,6 +104,9 @@ http_err_t server_init(char *port, int *sockfd);
 // --- END SOCKET UTIL ---
 int get_max_fd(fd_list_t *fd_list);
 
-int fd_select(fd_list_t *fd_list);
+int fd_select(fd_list_t *fd_list, fd_set *read_fds, fd_set *write_fds);
 
+int cache_recv(fd_node_t *fd_node);
+
+int cache_send(fd_node_t *fd_node);
 #endif

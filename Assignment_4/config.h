@@ -9,5 +9,6 @@
 #define DEBUG 0
 #define LRU_MAX_SLOT 10
 #define PROXY_MAX_CLIENT 3
+#define INITIAL_BUFFER 200
 
 #endif

@@ -88,7 +88,7 @@ http_err_t accept_client(int listen_fd, int *client_fd) {
   inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
             str, sin_size);
 
-  printf("server: got conection from %s\n", str);
+  printf("\nproxy: conection from %s\n", str);
   return HTTP_OK;
 }
 
@@ -446,8 +446,6 @@ int cache_send(fd_node_t *fd_node) {
   fd_node->offset += numbytes;
   // if send complete, reset offset to 0
   if (fd_node->offset >= fd_node->cache_node->buffer_size) {
-    printf("offset: %ld, size: %ld", fd_node->offset,
-           fd_node->cache_node->buffer_size);
     fd_node->status = IDLE;
     fd_node->offset = 0;
   }
@@ -529,7 +527,7 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   int server_fd;
   cache_recv(fd_node);
   if (fd_node->status == IDLE) { // read complete, start parsing
-    // printf("%s\n", fd_node->cache_node->buffer);
+    printf("client request complete:\n\n%s\n", fd_node->cache_node->buffer);
     // TODO: add parsing from http request
     if (server_lookup_connect("www.wikipedia.org", "80", &server_fd) !=
         HTTP_OK) {
@@ -569,19 +567,25 @@ http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
 
 http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   // send http response to client
-  printf("CLIENT WRITE NOT IMPLEMENTED\n");
+  cache_send(fd_node);
+  if (fd_node->status == IDLE) { // response sent complete
+    printf("complete writing to client size: %ld\n",
+           fd_node->cache_node->buffer_size);
+    fd_list_remove(fd_node);
+    free_fd_node(&fd_node);
+  } else {
+    printf("partial writing to client..\n");
+  }
   return HTTP_OK;
 }
 
 http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
-  fd_node_t *tmp_node;
   // read http response from server
   printf("reading from server\n");
   cache_recv(fd_node);
   if (fd_node->status == IDLE) {        // received full response
     fd_node->proxied->status = WRITING; // start writing to client
-    tmp_node = fd_node->next;
-    fd_list_remove(fd_node); // remove from select list
+    fd_list_remove(fd_node);            // remove from select list
     free_fd_node(&fd_node);
   }
   return HTTP_OK;

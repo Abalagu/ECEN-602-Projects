@@ -31,14 +31,14 @@ http_err_t main(int argc, char *argv[]) {
   while (1) {
     retval = fd_select(fd_list, &read_fds, &write_fds);
     if (retval == 0) {
-      printf("nothing happens...\n");
+      printf(".");
+      fflush(stdout);
       continue;
     } else if (retval == -1) {
       perror("select()");
       return HTTP_FAIL;
     }
-
-    printf("something happens!\n");
+    // normal service
     fd_node = fd_list->front;
     while (fd_node != NULL) {
       if (fd_node->type == DUMMY) {
@@ -96,7 +96,7 @@ http_err_t main(int argc, char *argv[]) {
       }
     } // end node traversal
 
-    printf("  end of fd node traversal\n");
+    // printf("  end of fd node traversal\n");
   } // end service loop
 
   close(listen_fd);

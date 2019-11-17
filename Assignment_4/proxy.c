@@ -25,7 +25,7 @@ void cache_enqueue_test() {
   print_cache_queue(cache_queue);
   return;
 }
-// --- END UNIT TEST FUNCTIONS ---
+
 void cache_eviction_test() {
   cache_queue_t *cache_queue = new_cache_queue(LRU_MAX_SLOT);
   cache_node_t *new_node;
@@ -52,6 +52,16 @@ void cache_eviction_test() {
   print_cache_node(evicted_node);
   return;
 }
+void fd_list_test() {
+  fd_list_t *fd_list = new_fd_list(PROXY_MAX_CLIENT);
+  print_fd_list(fd_list);
+  fd_node_t *new_node = new_fd_node(NULL, NULL, 1, LISTEN, NULL);
+  fd_list_append(fd_list, new_node);
+  print_fd_node(new_node);
+  print_fd_list(fd_list);
+  return;
+}
+// --- END UNIT TEST FUNCTIONS ---
 
 http_err_t main(int argc, char *argv[]) {
   if (argc != 3) {
@@ -60,6 +70,8 @@ http_err_t main(int argc, char *argv[]) {
   }
   // cache_init_test();
   // cache_enqueue_test();
-  cache_eviction_test();
+  // cache_eviction_test();
+  // fd_list_test();
+
   return HTTP_OK;
 }

@@ -151,99 +151,10 @@ http_err_t server_init(char *port, int *sockfd) {
   return HTTP_OK;
 }
 
-void sigchld_handler(int s) {
-  // waitpid() might overwrite errno, so we save and restore it:
-  int saved_errno = errno;
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
-  errno = saved_errno;
-}
-
-void parse_request(char req_buf[1500], request_t *req) {
-  // char url[1500]= "GET /somefile HTTP/1.0\r\nHost: www.go.com\r\nUser-Agent:
-  // Team4\r\n\r\n"; fix size
-  char buf[1500] = {0};
-
-  // separate the first line which contains the path
-  char *loc = strchr(req_buf, '\r');
-  int pos = (loc == NULL ? -1 : loc - req_buf);
-
-  // First 4 and last 13 contain standard HTTP version info, not needed
-  int _pos = pos - 13;
-  strncpy(req->path, &req_buf[4], _pos);
-
-  // rest of the header
-  memcpy(buf, &(req_buf[pos + 2]), 1500 * sizeof(char));
-
-  char *token;
-  char *_buf = buf;
-  char *key = malloc(strlen(buf));
-  char *value = malloc(strlen(buf));
-
-  // \r\n is the delim here according to spec
-  while ((token = strtok_r(_buf, "\r\n", &_buf))) {
-    // printf("token:%s\n", token);
-    loc = strchr(token, ' ');
-    pos = (loc == NULL ? -1 : loc - token);
-
-    strncpy(key, token, pos);
-    strncpy(value, &(token[pos + 1]), strlen(token));
-
-    if (!strcmp(key, "Host:")) {
-      strcpy(req->host, value);
-    } else if (!strcmp(key, "User-Agent:")) {
-      strcpy(req->user_agent, value);
-    } else if (!strcmp(key, "Connection:")) {
-      strcpy(req->connection, value);
-    }
-  }
-}
-
-void parse_response(char res_buf[1500], response_t *res) {
-  char buf[1500] = {0};
-
-  char *loc = strchr(res_buf, '\r');
-  int pos = (loc == NULL ? -1 : loc - res_buf);
-
-  // status code does not begin until 9
-  memcpy(res->status, &(res_buf[9]), pos - 9);
-
-  // copy rest of the buffer
-  memcpy(buf, &(res_buf[pos + 2]), 1500 * sizeof(char));
-  if (DEBUG)
-    printf("buf:%s\n", buf);
-
-  char *token;
-  char *_buf = buf;
-  char *key = malloc(strlen(buf));
-  char *value = malloc(strlen(buf));
-
-  // the delim is \r\n
-  while ((token = strtok_r(_buf, "\r\n", &_buf))) {
-    // printf("token:%s\n", token);
-    loc = strchr(token, ' ');
-    pos = (loc == NULL ? -1 : loc - token);
-
-    if (pos < 0) {
-      // EOF
-      break;
-    }
-
-    strncpy(key, token, pos);
-    strncpy(value, &(token[pos + 1]), strlen(token));
-
-    if (!strcmp(key, "Content-Length:")) {
-      strcpy(res->content_length, value);
-    } else if (!strcmp(key, "Date:")) {
-      strcpy(res->date, value);
-    }
-    // add more fields which we are interested in
-  }
-}
-
+// --- BEGIN LRU CACHE MANAGEMENT
 cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
                              size_t buffer_size) {
-  cache_node_t *cache_node = malloc(sizeof(cache_node_t));
+  cache_node_t *cache_node = calloc(1, sizeof(cache_node_t));
   // designated initializer in C99
   // https://stackoverflow.com/questions/7265583/combine-designated-initializers-and-malloc-in-c99
   *cache_node = (cache_node_t){
@@ -261,7 +172,7 @@ cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
 }
 
 cache_queue_t *new_cache_queue(size_t max_slot) {
-  cache_queue_t *cache_queue = malloc(sizeof(cache_queue_t));
+  cache_queue_t *cache_queue = calloc(1, sizeof(cache_queue_t));
   *cache_queue = (cache_queue_t){
       .max_slot = max_slot,
       .front = new_cache_node(NULL, NULL, 0), // create a node for head
@@ -359,3 +270,98 @@ void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node) {
   cache_queue->front = new_node;
   return;
 }
+// --- END LRU CACHE MANAGEMENT
+
+// --- BEGIN FD MANAGEMENT ---
+fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
+                       cache_node_t *cache_node) {
+  fd_node_t *new_node = calloc(1, sizeof(fd_node_t));
+  *new_node = (fd_node_t){
+      .prev = prev,
+      .next = next,
+      .fd = fd,
+      .type = type,
+      .cache_node = cache_node,
+  };
+  return new_node;
+}
+
+// create two dummy nodes to simplify append and remove
+fd_list_t *new_fd_list(int max_client) {
+  fd_list_t *fd_list = calloc(1, sizeof(fd_list_t));
+  fd_node_t *fd_front_dummy = new_fd_node(NULL, NULL, -1, DUMMY, NULL);
+  fd_node_t *fd_rear_dummy = new_fd_node(NULL, NULL, -1, DUMMY, NULL);
+  fd_front_dummy->next = fd_rear_dummy;
+  fd_rear_dummy->prev = fd_front_dummy;
+
+  *fd_list = (fd_list_t){
+      .front = fd_front_dummy,
+      .rear = fd_rear_dummy,
+      .max_client = max_client,
+  };
+  return fd_list;
+}
+
+void free_fd_node(fd_node_t **fd_node) {
+  if (*fd_node != NULL) {
+    free(*fd_node);
+    *fd_node = NULL;
+  }
+  return;
+}
+
+int count_client(fd_list_t *fd_list) {
+  int count = 0;
+  fd_node_t *next = fd_list->front;
+  while (next != NULL) {
+    if (next->type = CLIENT) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+// append before rear of the linked list
+void fd_list_append(fd_list_t *fd_list, fd_node_t *new_node) {
+  new_node->prev = fd_list->rear->prev;
+  new_node->next = fd_list->rear;
+  fd_list->rear->prev->next = new_node;
+  fd_list->rear->prev = new_node;
+  return;
+}
+
+// doubly linked list, concat prev and next to remove itself
+void fd_list_remove(fd_node_t *fd_node) {
+  fd_node->prev->next = fd_node->next;
+  fd_node->next->prev = fd_node->prev;
+  fd_node->prev = NULL;
+  fd_node->next = NULL;
+  return;
+}
+
+void print_fd_node(fd_node_t *fd_node) {
+  printf("prev: %s ", fd_node->prev == NULL ? "NULL" : "NOT");
+  printf("next: %s ", fd_node->next == NULL ? "NULL" : "NOT");
+  printf("fd: %d ", fd_node->fd);
+  printf("type: %d ", fd_node->type);
+  printf("cache node: %s\n", fd_node->cache_node == NULL ? "NULL" : "NOT");
+  return;
+}
+
+void print_fd_list(fd_list_t *fd_list) {
+  if (fd_list == NULL) {
+    printf("fd queue is NULL\n");
+    return;
+  }
+  int count = 0;
+  fd_node_t *fd_node = fd_list->front;
+  while (fd_node != NULL) {
+    print_fd_node(fd_node);
+    count += 1;
+    fd_node = fd_node->next;
+  }
+  printf("%d fdnode(s) printed\n", count);
+  return;
+}
+
+// --- END FD MANAGEMENT ---

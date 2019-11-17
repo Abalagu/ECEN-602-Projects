@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <regex.h>
 
 #include "config.h"
 #include "lib.h"

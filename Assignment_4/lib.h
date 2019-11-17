@@ -8,28 +8,14 @@ typedef enum http_err_t {
   HTTP_FAIL = -1,
 } http_err_t;
 
-typedef struct {
-  char host[253]; // max size of a domain name
-  // randomly assigned, need a fix
-  char path[1500];
-  // these for testing
-  char user_agent[10];
-  char connection[10];
-} request_t;
-
-typedef struct {
-  // add fields you need to check
-  char status[20];
-  char content_length[10];
-  char date[30];
-  // etc, etc
-} response_t;
+typedef enum node_status_t {
+  IN_USE = 1,  // for lru cache
+  IDLE = 2,    // for lru cache
+  READING = 3, // for socket select
+  WRITING = 4, // for socket select
+} node_status_t;
 
 // --- BEGIN LRU CACHE MANAGEMENT ---
-typedef enum node_status_t {
-  IN_USE = 1,
-  NOT_IN_USE = 2,
-} node_status_t;
 
 typedef struct cache_node_t {
   struct cache_node_t *prev, *next;
@@ -72,6 +58,7 @@ typedef struct fd_node_t {
   struct fd_node_t *prev, *next;
   int fd;
   fd_type_t type;
+  node_status_t status;
   cache_node_t *cache_node;
 } fd_node_t;
 
@@ -81,7 +68,7 @@ typedef struct fd_list_t {
 } fd_list_t;
 
 fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
-                       cache_node_t *cache_node);
+                       node_status_t status, cache_node_t *cache_node);
 
 fd_list_t *new_fd_list(int max_client);
 
@@ -99,6 +86,7 @@ void print_fd_list(fd_list_t *fd_queue);
 
 // --- END FD MANAGEMENT ---
 
+// --- BEGIN SOCKET UTIL ---
 http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd);
 
 int written(int sockfd, char *buf, size_t size_buf);
@@ -111,8 +99,9 @@ http_err_t accept_client(int listen_fd, int *client_fd);
 
 http_err_t server_init(char *port, int *sockfd);
 
-void parse_request(char req_buf[1500], request_t *req);
+// --- END SOCKET UTIL ---
+int get_max_fd(fd_list_t *fd_list);
 
-void parse_response(char res_buf[1500], response_t *res);
+int fd_select(fd_list_t *fd_list);
 
 #endif

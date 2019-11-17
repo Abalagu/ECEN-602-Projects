@@ -162,7 +162,7 @@ cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
       .next = next,
       .buffer = NULL,
       .buffer_size = buffer_size,
-      .status = NOT_IN_USE,
+      .status = IDLE,
   };
   if (buffer_size != 0) {
     // use calloc instead of malloc to both allocate and init to 0
@@ -224,10 +224,10 @@ void free_cache_queue(cache_queue_t **cache_queue) {
 
 void print_cache_node(cache_node_t *cache_node) {
   printf("buffer size: %ld ", cache_node->buffer_size);
-  printf("buffer: %s ", cache_node->buffer == NULL ? "NULL" : "NOT NULL");
+  printf("buffer: %s ", cache_node->buffer == NULL ? "NULL" : "NOTN");
   printf("status: %d ", cache_node->status);
-  printf("prev: %s ", cache_node->prev == NULL ? "NULL" : "NOT NULL");
-  printf("next: %s\n", cache_node->next == NULL ? "NULL" : "NOT NULL");
+  printf("prev: %s ", cache_node->prev == NULL ? "NULL" : "NOTN");
+  printf("next: %s\n", cache_node->next == NULL ? "NULL" : "NOTN");
   return;
 }
 
@@ -250,8 +250,8 @@ void cache_dequeue(cache_queue_t *cache_queue) {
   cache_node_t *tmp_node = cache_queue->rear->prev;
   cache_queue->rear->prev = NULL; // evicted, null its prev and next
   cache_queue->rear->next = NULL; // by default rear.next is NULL
-  // if NOT_IN_USE, free the memory
-  if (cache_queue->rear->status == NOT_IN_USE) {
+  // if IDLE, free the memory
+  if (cache_queue->rear->status == IDLE) {
     free_cache_node(&cache_queue->rear);
   }
   // if IN_USE, let the using process free its memory
@@ -274,13 +274,14 @@ void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node) {
 
 // --- BEGIN FD MANAGEMENT ---
 fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
-                       cache_node_t *cache_node) {
+                       node_status_t status, cache_node_t *cache_node) {
   fd_node_t *new_node = calloc(1, sizeof(fd_node_t));
   *new_node = (fd_node_t){
       .prev = prev,
       .next = next,
       .fd = fd,
       .type = type,
+      .status = status,
       .cache_node = cache_node,
   };
   return new_node;
@@ -289,8 +290,8 @@ fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
 // create two dummy nodes to simplify append and remove
 fd_list_t *new_fd_list(int max_client) {
   fd_list_t *fd_list = calloc(1, sizeof(fd_list_t));
-  fd_node_t *fd_front_dummy = new_fd_node(NULL, NULL, -1, DUMMY, NULL);
-  fd_node_t *fd_rear_dummy = new_fd_node(NULL, NULL, -1, DUMMY, NULL);
+  fd_node_t *fd_front_dummy = new_fd_node(NULL, NULL, -1, DUMMY, IDLE, NULL);
+  fd_node_t *fd_rear_dummy = new_fd_node(NULL, NULL, -1, DUMMY, IDLE, NULL);
   fd_front_dummy->next = fd_rear_dummy;
   fd_rear_dummy->prev = fd_front_dummy;
 
@@ -344,6 +345,7 @@ void print_fd_node(fd_node_t *fd_node) {
   printf("next: %s ", fd_node->next == NULL ? "NULL" : "NOT");
   printf("fd: %d ", fd_node->fd);
   printf("type: %d ", fd_node->type);
+  printf("status: %d ", fd_node->status);
   printf("cache node: %s\n", fd_node->cache_node == NULL ? "NULL" : "NOT");
   return;
 }
@@ -365,3 +367,35 @@ void print_fd_list(fd_list_t *fd_list) {
 }
 
 // --- END FD MANAGEMENT ---
+
+// --- BEGIN SOCKET UTIL ---
+int get_max_fd(fd_list_t *fd_list) {
+  int fd_max = 0;
+  fd_node_t *next = fd_list->front;
+  while (next != NULL) {
+    fd_max = next->fd > fd_max ? next->fd : fd_max;
+    next = next->next;
+  }
+  return fd_max;
+}
+
+// select call based on fd status, pass select retval to outside
+int fd_select(fd_list_t *fd_list) {
+  struct timeval tv;
+  fd_set read_fds, write_fds;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  FD_ZERO(&read_fds);
+  FD_ZERO(&write_fds);
+  fd_node_t *node = fd_list->front;
+  while (node != NULL) {
+    if (node->status == READING) {
+      FD_SET(node->fd, &read_fds);
+    } else if (node->status == WRITING) {
+      FD_SET(node->fd, &write_fds);
+    }
+    node = node->next;
+  }
+  return select(get_max_fd(fd_list) + 1, &read_fds, &write_fds, NULL, &tv);
+}
+// --- END SOCKET UTIL ---

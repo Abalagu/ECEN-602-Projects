@@ -449,13 +449,21 @@ void fd_list_remove(fd_node_t *fd_node) {
 }
 
 void print_fd_node(fd_node_t *fd_node) {
-  printf("prev: %s ", fd_node->prev == NULL ? "NULL" : "NOTN");
-  printf("next: %s ", fd_node->next == NULL ? "NULL" : "NOTN");
-  printf("fd: %d ", fd_node->fd);
-  printf("type: %d ", fd_node->type);
-  printf("status: %d ", fd_node->status);
-  printf("cache node: %s ", fd_node->cache_node == NULL ? "NULL" : "NOTN");
-  printf("offset: %ld\n", fd_node->offset);
+  if (fd_node->type == 2) {
+    printf("client node, request url: %s\n",
+           fd_node->cache_node->http_info->path);
+  } else if (fd_node->type == 3) {
+    printf("server node, reequest url: %s\n",
+           fd_node->cache_node->http_info->path);
+  }
+
+  // printf("prev: %s ", fd_node->prev == NULL ? "NULL" : "NOTN");
+  // printf("next: %s ", fd_node->next == NULL ? "NULL" : "NOTN");
+  // printf("fd: %d ", fd_node->fd);
+  // printf("type: %d ", fd_node->type);
+  // printf("status: %d ", fd_node->status);
+  // printf("cache node: %s ", fd_node->cache_node == NULL ? "NULL" : "NOTN");
+  // printf("offset: %ld\n", fd_node->offset);
   return;
 }
 
@@ -465,13 +473,14 @@ void print_fd_list(fd_list_t *fd_list) {
     return;
   }
   int count = 0;
+  printf(" Current Connection: \n");
   fd_node_t *fd_node = fd_list->front;
   while (fd_node != NULL) {
     print_fd_node(fd_node);
     count += 1;
     fd_node = fd_node->next;
   }
-  printf("%d fdnode(s) printed\n", count);
+  // printf("%d fdnode(s) printed\n", count);
   return;
 }
 
@@ -713,7 +722,7 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
   if (fd_node->status == IDLE) {              // read complete, start parsing
     if (strstr(buffer, "\r\n\r\n") != NULL) { // contains \r\n\r\n
       parse_request(buffer, fd_node->cache_node->http_info);
-      // print_http_info(fd_node->cache_node->http_info);
+      // print_fd_list(fd_list);
     }
 
     if (server_lookup_connect(fd_node->cache_node->http_info->host, "80",
@@ -762,7 +771,6 @@ http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   client_node = new_fd_node(NULL, NULL, client_fd, CLIENT, READING,
                             new_cache_node(NULL, NULL, INITIAL_BUFFER));
   fd_list_append(fd_list, client_node);
-  // print_fd_list(fd_list);
   printf("client accepted.\n");
   return HTTP_OK;
 }

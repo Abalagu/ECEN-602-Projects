@@ -67,6 +67,7 @@ to serve later on a similar request.
 ## Test cases
 
 - **TEST CASE 1**: A cache hit returns the saved data to the requester
+
 ![cache hit](test_cases/cache_hit.png)
 
 
@@ -79,11 +80,14 @@ to serve later on a similar request.
 #### cache state before cache miss
 * sctp.7.html as first node
 * send.2.html as last node
+
 ![cache state 1](test_cases/cache_full_state_1.jpg)
+
 #### cache state after cache miss and enqueue
 * sctp.7.html as second node,
 * cache miss item epoll.7 as first node
 * send.2.html evicted from the queue
+
 ![cache state 2](test_cases/cache_full_state_2.jpg)
 
 - **TEST CASE 4**: (Modified according to bonus feature) This test case is not necessary in a conditional get architecture. 
@@ -96,8 +100,13 @@ to serve later on a similar request.
 - **TEST CASE 6**: (Modified according to bonus feature) A cache hit entry verified by CONDITIONAL GET with 304 response is sent to the client.
 
 ~~A cache entry without an `Expires` header that has been previously accessed from the Web server in the last 24 hours and was last modified more than one month ago is returned to the requester~~
+
 * return cache item with 304 as response status code
+
 ![cache hit](test_cases/cache_hit.png)
 
 - **TEST CASE 7**: Three clients can simultaneously access the proxy server and get the correct data 
+* three scripts are added to request for long manual pages, namely run_client1.sh, run_client2.sh, and run_client3.sh
+
+![simultaneous connection](test_cases/simultaneous_connection.png)
 

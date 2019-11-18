@@ -1,3 +1,421 @@
+# HTTP Proxy
+
+## Team 4
+
+## Contribution
+
+- Akhilesh: **Client, request and response parsers**
+- Luming: **Server, Cache**
+
+## File Structure 
+
+- `client.c`: Contains the HTTP client code
+- `proxy.c`: Contains the HTTP proxy server code
+- `config.h`: Contains configuration params
+- `lib.h`: utility functions used across cache, proxy server and client.
+
+## to run
+
+- with `run_proxy.sh` and `run_client.sh`
+  - the destination address can be changed in the `run_client.sh` script.
+
+- with `./proxy <ip to bind> <port to bind>` to run the proxy
+- with `./client <proxy address> <proxy port> <URL to rerieve>` to run the client.
+
+## Bonus Points Implemented
+
+- Yes
+* If the client request url results in a cache miss, a normal GET is sent.
+* If the client request url results in a cache hit, a CONDITIONAL GET is sent with `If-Modified-Since` header field, filled with the last received `Date` value.  
+    * If server response is of status code `304 Not Modified`, then the `Date` field recorded in the cache is updated to the latest received time, and the document is sent to client directly from the cache.
+    * If server response is of any other status code, then the proxy server reacts accordingly, as is specified in `RFC1945 page 42-43`
+* As is stated in the Bonus section, `"You can also cache a document in the proxy that is missing both Expires and Last-Modified headers"`, thus the proxy server is implemented to cache each response and check with conditional get if a cache hit ever occurs.
+## Architecture
+
+### Client
+
+The client accepts the proxy address and port, and the destination target url as 
+command line args. The client can parse the destination target url passed to it in any of the
+following forms and create the correct request:
+
+- `www.cpluscplus.com`
+- `www.cpluscplus.com/some`
+- `https://www.cpluscplus.com`
+- `https://www.cpluscplus.com/some`
+
+For now, we pass the host, path and user-agent in our request. Adding more fields
+is trivial.
+
+### Cache
+
+* Our cache structure is detailed in `lib.h`. It is a doubly linked list, whose every node serves as a cache unit. Apart from relevant pointers, each node stores cache status for that node, stored response size and http header information. We also have cache print utility functions.
+
+* During initialization of cache queue, 10 dummy nodes are filled in, thus queue remains a constant size when performing eviction and enqueue.  
+
+### Proxy server
+The proxy server maintains a record of clients connected to it simultaneously. The
+assigned file descriptors are stored in another doubly linked list. We
+use `select()` call to serve current connections and accept new ones. During a 
+connection request from a client, the proxy server first parses the request for URL
+to get the hostname and the path. To retrieve more fields, the parser can be modified which
+is trivial. We then check for a similar entry in our cache. If found and
+valid, the proxy server responds back to the client with the same. Otherwise, it sends the
+request received to the destination url and waits for the response and caches it for it
+to serve later on a similar request. 
+
+
+## Test cases
+
+- **TEST CASE 1**: A cache hit returns the saved data to the requester
+
+![cache hit](test_cases/cache_hit.png)
+
+
+- **TEST CASE 2**: A request that is not in the cache is proxied, saved in the cache and returned to the requester
+
+![cache miss](test_cases/cache_miss_enqueue.png)
+
+- **TEST CASE 3**: A cache miss with 10 items already in the cache is proxied, saved in the LRU location in cache, and the data is returned to the requester
+
+#### cache state before cache miss
+* sctp.7.html as first node
+* send.2.html as last node
+
+![cache state 1](test_cases/cache_full_state_1.jpg)
+
+#### cache state after cache miss and enqueue
+* sctp.7.html as second node,
+* cache miss item epoll.7 as first node
+* send.2.html evicted from the queue
+
+![cache state 2](test_cases/cache_full_state_2.jpg)
+
+- **TEST CASE 4**: (Modified according to bonus feature) This test case is not necessary in a conditional get architecture. 
+~~A stale `Expires` header in the cache is accessed, the cache entry is replaced with a fresh copy, and the fresh data is delivered to the requester~~
+
+- **TEST CASE 5**: (Modified according to bonus feature) A cache hit entry verified by CONDITIONAL GET with 200 response is replaced with new content, then sent to the client
+
+~~A stale entry in the cache without an `Expires` header is determined based on the last Web server access time and last modification time, the stale cache entry is replaced with fresh data, and the fresh data is delivered to the requester~~
+
+- **TEST CASE 6**: (Modified according to bonus feature) A cache hit entry verified by CONDITIONAL GET with 304 response is sent to the client.
+
+~~A cache entry without an `Expires` header that has been previously accessed from the Web server in the last 24 hours and was last modified more than one month ago is returned to the requester~~
+
+* return cache item with 304 as response status code
+
+![cache hit](test_cases/cache_hit.png)
+
+- **TEST CASE 7**: Three clients can simultaneously access the proxy server and get the correct data 
+* three scripts are added to request for long manual pages, namely run_client1.sh, run_client2.sh, and run_client3.sh
+
+![simultaneous connection](test_cases/simultaneous_connection.png)
+
+## Source Code
+### Makefile
+```c
+all : client proxy
+
+client : client.o lib.o
+	cc -o client client.o lib.o
+
+proxy : proxy.o lib.o
+	cc -o proxy proxy.o lib.o
+
+
+# lib_debug : lib.o
+# 	gcc -g -c lib.c lib.o
+
+proxy_debug: 
+	gcc -g -c lib.c
+	gcc -g proxy.c -o proxy lib.o
+
+.PHONY : clean
+clean :
+	rm *.o client proxy 
+	# rm *.o *.html client proxy 
+
+```
+### client.c
+```c
+#include "headers.h"
+#include "lib.h"
+http_err_t open_file(FILE **fp, char *filename, char *mode) {
+  *fp = fopen(filename, mode);
+  if (*fp == NULL) {
+    printf("file: %s. open failed.\n", filename);
+    return HTTP_FAIL;
+  } else {
+    return HTTP_OK;
+  }
+}
+size_t write_data_to_file(FILE **fd, char *buf, size_t _numbytes,
+                          off_t offset) {
+  size_t numbytes;
+  numbytes = fwrite(buf + offset, 1, _numbytes, *fd);
+  return numbytes;
+}
+
+char *get_filename(char *str) {
+  /* get the first token */
+  const char separator[] = "/";
+  char *token, *tmp;
+  token = strtok(str, separator);
+
+  /* walk through other tokens */
+  while (token != NULL) {
+    tmp = token;
+    token = strtok(NULL, separator);
+  }
+  return tmp;
+}
+
+http_err_t main(int argc, char *argv[]) {
+  if (argc != 4) {
+    printf("usage: ./client <proxy address> <proxy port> <URL to rerieve>\n");
+    return HTTP_FAIL;
+  }
+  http_err_t retval;
+
+  // TODO:: validate args
+
+  char *proxy_address = argv[1];
+  char *proxy_port = argv[2];
+  char *url;
+
+  // this client supports all the possbile formats
+  //  "www.cpluscplus.com";
+  //  "www.cpluscplus.com/some";
+  //  "https://www.cpluscplus.com";
+  //  "https://www.cpluscplus.com/some";
+
+  //  printf("address: %s, port: %s, target: %s\n", proxy_address, proxy_port,
+  //  argv[3]);
+
+  int _size = strlen(argv[3]);
+
+  url = malloc(_size * sizeof(char));
+  memcpy(url, argv[3], _size);
+
+  int numbytes = 0;
+  printf("address: %s, port: %s, target: %s\n", proxy_address, proxy_port, url);
+
+  int sockfd = 0;
+
+  char *path = malloc(_size * sizeof(char));
+  char *host = malloc(_size * sizeof(char));
+  char *_u = malloc(_size * sizeof(char));
+  char *_p = malloc(_size * sizeof(char));
+  char *loc;
+
+  char buf_send[1500] = {0};
+  char buf_recv[1500] = {0};
+  char request[1500] = {0};
+
+  loc = strchr(url, '/');
+  int pos = (loc == NULL ? -1 : loc - url);
+
+  // to fallback in case passed url does not start with https/http
+  memcpy(_u, url, _size);
+
+  if (pos > 0) {
+    memcpy(_p, url, pos);
+  }
+
+  // if url began with https/http
+  if (!strcmp(_p, "http:") || !strcmp(_p, "https:")) {
+    // update _u
+    memcpy(_u, &(url[pos + 2]), _size);
+    // look for path in the rest
+    loc = strchr(_u, '/');
+    pos = (loc == NULL ? -1 : loc - _u);
+  }
+
+  if (pos > 0) {
+    // we have our host address
+    memcpy(host, _u, pos);
+    memcpy(path, &(_u[pos]), _size);
+  } else {
+    // fall back to previous safe values
+    strcpy(host, _u);
+    strcpy(path, "/");
+  }
+
+  // add more fields if required
+  sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Team4\r\n\r\n",
+          path, host);
+
+  char *filename = strdup(path);
+
+  printf("request: %s\n", request);
+  memcpy(buf_send, request, sizeof(request));
+  printf("path: %s\n", path);
+
+  if (server_lookup_connect(proxy_address, proxy_port, &sockfd) != HTTP_OK) {
+    return HTTP_FAIL;
+  }
+  numbytes = written(sockfd, request, strlen(request) + 1);
+  printf("sent request to server\n");
+  filename = get_filename(filename);
+  printf("filename: %s\n", filename);
+  FILE *fp;
+  open_file(&fp, filename, "a");
+
+  // first recv treatment
+  numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
+  if (numbytes == 0) {
+    printf("server disconnected!\n");
+    return HTTP_FAIL;
+  }
+  http_info_t *http_info = calloc(1, sizeof(http_info_t));
+  parse_response(buf_recv, http_info);
+  int content_length = atoi(http_info->content_length);
+  printf("content length: %d\n", content_length);
+
+  char *entity_body_head = strstr(buf_recv, "\r\n\r\n");
+  off_t offset = entity_body_head - buf_recv + 4;
+  printf("offset: %ld\n", offset);
+  numbytes = write_data_to_file(&fp, buf_recv + offset, numbytes - offset, 0);
+  int count = numbytes;
+
+  while (1) {
+    numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
+    if (numbytes == 0) {
+      fclose(fp);
+      break;
+    } else {
+      offset = 0;
+      if (count + numbytes > content_length) {
+        offset = count + numbytes - content_length;
+        write_data_to_file(&fp, buf_recv, numbytes - offset, 0);
+        fclose(fp);
+        exit(0);
+      } else {
+        write_data_to_file(&fp, buf_recv, numbytes, 0);
+        count += numbytes;
+      }
+      printf("written %ld bytes to file..\n", numbytes - offset);
+    }
+  }
+  // printf("\n\nResponse:\n%s\n", buf_recv);
+}
+
+```
+
+### proxy.c
+```c
+#include "headers.h"
+
+http_err_t main(int argc, char *argv[]) {
+  if (argc != 3) {
+    printf("usage: ./proxy <ip to bind> <port to bind>\n");
+    return HTTP_FAIL;
+  }
+  // cache_init_test();
+  // cache_enqueue_test();
+  // cache_eviction_test();
+  // fd_list_test();
+  // return HTTP_OK;
+
+  char *proxy_ip = argv[1], *proxy_port = argv[2];
+  int listen_fd;
+  int retval;
+  int client_fd, server_fd;
+  fd_node_t *client_node, *server_node, *tmp_node;
+  fd_set read_fds, write_fds;
+
+  fd_list_t *fd_list = new_fd_list(PROXY_MAX_CLIENT);
+  cache_queue_t *cache_queue = new_cache_queue(LRU_MAX_SLOT);
+  if (server_init(proxy_port, &listen_fd) != HTTP_OK) {
+    return HTTP_FAIL;
+  };
+  fd_node_t *fd_node =
+      new_fd_node(NULL, NULL, listen_fd, LISTEN, READING, NULL);
+
+  fd_list_append(fd_list, fd_node);
+
+  while (1) {
+    retval = fd_select(fd_list, &read_fds, &write_fds);
+    // print_fd_list(fd_list);
+    if (retval == 0) {
+      printf(".");
+      fflush(stdout);
+      continue;
+    } else if (retval == -1) {
+      perror("select()");
+      return HTTP_FAIL;
+    }
+    // normal service
+    fd_node = fd_list->front;
+    while (fd_node != NULL) {
+      if (fd_node->type == DUMMY) {
+        fd_node = fd_node->next;
+        continue;
+      } // skip dummy node
+
+      // accept new connection
+      if (fd_node->type == LISTEN) {
+        if (FD_ISSET(fd_node->fd, &read_fds)) {
+          tmp_node = fd_node->next;
+          listen_fd_handler(fd_list, fd_node);
+          print_fd_list(fd_list);
+          fd_node = tmp_node;
+        } else { // no incoming connection
+          fd_node = fd_node->next;
+        }
+        continue;
+      }
+
+      // read http request from client
+      if (fd_node->type == CLIENT) {
+        if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
+          tmp_node = fd_node->next;
+          client_read_handler(fd_list, fd_node, cache_queue);
+          fd_node = tmp_node;
+        }
+        // send http response
+        else if (fd_node->status == WRITING &&
+                 FD_ISSET(fd_node->fd, &write_fds)) {
+          tmp_node = fd_node->next;
+          client_write_handler(fd_list, fd_node);
+        } else { // fd not set
+          fd_node = fd_node->next;
+        }
+        continue;
+      }
+
+      if (fd_node->type == SERVER) {
+        if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
+          tmp_node = fd_node->next;
+          server_read_handler(fd_list, fd_node, cache_queue);
+          fd_node = tmp_node;
+        } // http response read complete
+        else if (fd_node->status == WRITING &&
+                 FD_ISSET(fd_node->fd, &write_fds)) {
+          tmp_node = fd_node->next;
+          server_write_handler(fd_list, fd_node);
+          fd_node = tmp_node;
+        } else {
+          fd_node = fd_node->next;
+        } // http request send complete
+        continue;
+      } else {
+        // nothing matched, current fd not set, go to next node
+        fd_node = fd_node->next;
+        continue;
+      }
+    } // end node traversal
+
+    // printf("  end of fd node traversal\n");
+  } // end service loop
+
+  close(listen_fd);
+  return HTTP_OK;
+}
+
+
+```
+### lib.c
+```c
 
 #include "lib.h"
 
@@ -828,3 +1246,344 @@ http_err_t server_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   return HTTP_OK;
 }
 // --- END UNIT TEST FUNCTIONS ---
+```
+### lib.h
+```c
+#ifndef LIB_H_
+#define LIB_H_
+
+#include "headers.h"
+
+typedef enum http_err_t {
+  HTTP_OK = 0,
+  HTTP_FAIL = -1,
+} http_err_t;
+
+typedef enum node_status_t {
+  IN_USE = 1,  // for lru cache
+  IDLE = 2,    // for lru cache // indicate operation complete
+  READING = 3, // for socket select
+  WRITING = 4, // for socket select
+} node_status_t;
+
+// -- HTTP INFO
+typedef struct {
+  char host[253]; // max size of a domain name
+  // randomly assigned, need a fix
+  char path[1500];
+  // these for testing
+  char user_agent[10];
+  char connection[10];
+} request_t;
+
+typedef struct {
+  // add fields you need to check
+  char status[20];
+  char content_length[10];
+  char date[30];
+  // etc, etc
+} response_t;
+
+typedef struct http_info_t {
+  char host[253]; // max size of a domain name
+  // randomly assigned, need a fix
+  char path[100];
+  // these for testing
+  char user_agent[10];
+  char connection[10];
+  // add fields you need to check
+  char status[20];
+  char content_length[10];
+  char date[30];
+  // etc, etc
+  int info_complete;
+} http_info_t;
+
+void print_http_info(http_info_t *http_info);
+// -- HTTP INFO
+
+// --- BEGIN LRU CACHE MANAGEMENT ---
+
+typedef struct cache_node_t {
+  struct cache_node_t *prev, *next;
+  char *buffer;
+  size_t buffer_size;
+  http_info_t *http_info;
+  node_status_t status;
+} cache_node_t;
+
+typedef struct cache_queue_t {
+  int max_slot;
+  cache_node_t *front, *rear;
+} cache_queue_t;
+
+cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
+                             size_t buffer_size);
+
+cache_queue_t *new_cache_queue(size_t max_slot);
+
+void free_cache_node(cache_node_t **cache_node);
+
+void free_cache_queue(cache_queue_t **cache_queue);
+
+void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node);
+
+void print_cache_node(cache_node_t *cache_node);
+
+void print_cache_queue(cache_queue_t *cache_queue);
+
+cache_node_t *is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info);
+
+void parse_request(char req_buf[1500], http_info_t *req);
+
+void parse_response(char res_buf[1500], http_info_t *res);
+// --- END LRU CACHE MANAGEMENT
+
+// --- BEGIN FD MANAGEMENT ---
+typedef enum fd_type_t {
+  DUMMY = 0,
+  LISTEN = 1,
+  CLIENT = 2,
+  SERVER = 3,
+} fd_type_t;
+
+typedef struct fd_node_t {
+  struct fd_node_t *prev, *next, *proxied;
+  int fd;
+  fd_type_t type;
+  node_status_t status;
+  // reference cache hit node in backup
+  cache_node_t *cache_node, *cache_node_backup;
+  off_t offset; // record partial read/write progress
+  int flag;     // 1 for conditional get, 2 for normal get
+} fd_node_t;
+
+typedef struct fd_list_t {
+  fd_node_t *front, *rear;
+  int max_client;
+} fd_list_t;
+
+fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
+                       node_status_t status, cache_node_t *cache_node);
+
+fd_list_t *new_fd_list(int max_client);
+
+void fd_list_append(fd_list_t *fd_list, fd_node_t *new_node);
+
+void fd_list_remove(fd_node_t *fd_node);
+
+void free_fd_node(fd_node_t **fd_node);
+
+void free_fd_list(fd_list_t **fd_list);
+
+void print_fd_node(fd_node_t *fd_node);
+
+void print_fd_list(fd_list_t *fd_list);
+
+// --- END FD MANAGEMENT ---
+
+// --- BEGIN SOCKET UTIL ---
+http_err_t server_lookup_connect(char *host, char *server_port, int *sock_fd);
+
+int written(int sockfd, char *buf, size_t size_buf);
+
+int readline(int sockfd, char *recvbuf, size_t read_size);
+
+void print_hex(void *array, size_t len);
+
+http_err_t accept_client(int listen_fd, int *client_fd);
+
+http_err_t server_init(char *port, int *sockfd);
+
+int get_max_fd(fd_list_t *fd_list);
+
+int fd_select(fd_list_t *fd_list, fd_set *read_fds, fd_set *write_fds);
+
+int cache_recv(fd_node_t *fd_node);
+
+int cache_send(fd_node_t *fd_node);
+
+http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
+                               cache_queue_t *cache_queue);
+http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
+                               cache_queue_t *cache_queue);
+http_err_t server_write_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+// --- END SOCKET UTIL ---
+
+// --- BEGIN UNIT TEST FUNCTIONS ---
+void cache_init_test();
+void cache_enqueue_test();
+void cache_eviction_test();
+void fd_list_test();
+// --- END UNIT TEST FUNCTIONS ---
+
+#endif
+
+```
+
+### headers.h
+```c
+#ifndef HEADERS_H_
+#define HEADERS_H_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <regex.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#include "config.h"
+#include "lib.h"
+
+#endif
+```
+
+### config.h
+```c
+#ifndef CONFIG_H_
+#define CONFIG_H_
+
+#define REMOTE_PORT "80"
+#define PROXY_ADDRESS "localhost"
+#define PROXY_PORT "4950"
+#define MAX_DATA_SIZE 1500
+#define BACKLOG 10
+#define DEBUG 0
+#define LRU_MAX_SLOT 10
+#define PROXY_MAX_CLIENT 3
+#define INITIAL_BUFFER 200
+
+#endif
+
+```
+
+### run_client.sh
+```c
+make clean
+make client
+retval=$?
+proxy_address="localhost"
+proxy_port="4950"
+# url="http://man7.org/linux/man-pages/man2/send.2.html"
+# url="http://man7.org/linux/man-pages/man2/open.2.html"
+# url="http://man7.org/linux/man-pages/man1/diff.1.html"
+# url="http://man7.org/linux/man-pages/man7/regex.7.html"
+# url="http://man7.org/linux/man-pages/man2/accept.2.html"
+# url="http://man7.org/linux/man-pages/man2/getpeername.2.html"
+url="http://man7.org/linux/man-pages/man2/socket.2.html"
+# url="http://man7.org/linux/man-pages/man2/listen.2.html"
+# url="http://man7.org/linux/man-pages/man2/bind.2.html"
+# url="http://man7.org/linux/man-pages/man7/sctp.7.html"
+# url="http://man7.org/linux/man-pages/man7/epoll.7.html"
+
+if [ $retval -eq 0 ]; then
+    # clear
+    ./client $proxy_address $proxy_port $url
+else
+    echo MAKE CLIENT ERROR
+fi
+
+```
+
+### run_test.sh
+```c
+make clean
+make client
+retval=$?
+proxy_address="localhost"
+proxy_port="4950"
+declare -a arr=(
+    "http://man7.org/linux/man-pages/man2/send.2.html"
+    "http://man7.org/linux/man-pages/man2/send.2.html"
+    "http://man7.org/linux/man-pages/man2/open.2.html"
+    "http://man7.org/linux/man-pages/man1/diff.1.html"
+    "http://man7.org/linux/man-pages/man7/regex.7.html"
+    "http://man7.org/linux/man-pages/man2/accept.2.html"
+    "http://man7.org/linux/man-pages/man2/getpeername.2.html"
+    "http://man7.org/linux/man-pages/man2/socket.2.html"
+    "http://man7.org/linux/man-pages/man2/listen.2.html"
+    "http://man7.org/linux/man-pages/man2/bind.2.html"
+    "http://man7.org/linux/man-pages/man7/sctp.7.html"
+    "http://man7.org/linux/man-pages/man7/epoll.7.html"
+    "http://man7.org/linux/man-pages/man7/epoll.7.html"
+)
+
+if [ $retval -eq 0 ]; then
+    clear
+    for i in "${arr[@]}"; do
+        url=$i
+        ./client $proxy_address $proxy_port $url
+    done
+
+else
+    echo MAKE CLIENT ERROR
+fi
+
+```
+### run_proxy.sh
+```c
+make clean
+clear
+mode=$1 # get first cmd arg
+local_address="localhost"
+local_port="4950"
+# if with mode flag, then run debug  mode
+if [[ -n "$mode" ]]; then
+    make proxy_debug
+    echo "Debug proxy server"
+    gdb --args proxy $local_address $local_port
+else # else with no flag, launch in normal mode
+    make proxy
+    retval=$?
+    if [ $retval -eq 0 ]; then
+        echo "Launch proxy server"
+        ./proxy $local_address $local_port
+    else
+        echo MAKE PROXY ERROR
+    fi
+fi
+
+```
+
+### .gitignore
+```gitignore
+# Ignore all
+*
+
+# Unginore all with extensions
+!*.*
+
+# Ignore all .o files
+*.o
+
+# Ignore IDE config
+.vscode/
+
+# Ignore test folder
+test/
+
+# Ignore retrieved html file
+*.html
+
+# Add test case screenshot
+!test_cases/
+
+#
+!Makefile
+
+```

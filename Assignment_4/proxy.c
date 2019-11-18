@@ -52,6 +52,7 @@ http_err_t main(int argc, char *argv[]) {
         if (FD_ISSET(fd_node->fd, &read_fds)) {
           tmp_node = fd_node->next;
           listen_fd_handler(fd_list, fd_node);
+          print_fd_list(fd_list);
           fd_node = tmp_node;
         } else { // no incoming connection
           fd_node = fd_node->next;
@@ -88,6 +89,8 @@ http_err_t main(int argc, char *argv[]) {
           tmp_node = fd_node->next;
           server_write_handler(fd_list, fd_node);
           fd_node = tmp_node;
+        } else {
+          fd_node = fd_node->next;
         } // http request send complete
         continue;
       } else {

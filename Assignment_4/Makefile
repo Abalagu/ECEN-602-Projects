@@ -16,4 +16,5 @@ proxy_debug:
 
 .PHONY : clean
 clean :
-	rm *.o *.html client proxy 
+	rm *.o client proxy 
+	# rm *.o *.html client proxy 

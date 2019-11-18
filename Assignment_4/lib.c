@@ -90,7 +90,7 @@ void parse_response(char res_buf[1500], http_info_t *res) {
   }
 
   token = strstr(res_buf, "\r\n\r\n");
-  printf("\n\n  RESPONSE HEADER:\n%.*s", (int)(token - res_buf), res_buf);
+  // printf("\n\n  RESPONSE HEADER:\n%.*s", (int)(token - res_buf), res_buf);
   free(key);
   free(value);
 }
@@ -302,11 +302,15 @@ void free_cache_queue(cache_queue_t **cache_queue) {
 }
 
 void print_cache_node(cache_node_t *cache_node) {
-  printf("buffer size: %ld ", cache_node->buffer_size);
-  printf("buffer: %s ", cache_node->buffer == NULL ? "NULL" : "NOTN");
-  printf("status: %d ", cache_node->status);
-  printf("prev: %s ", cache_node->prev == NULL ? "NULL" : "NOTN");
-  printf("next: %s\n", cache_node->next == NULL ? "NULL" : "NOTN");
+  printf("host: %s%s\n", cache_node->http_info->host,
+         cache_node->http_info->path);
+  printf("date: %s\n", cache_node->http_info->date);
+
+  // printf("buffer size: %ld ", cache_node->buffer_size);
+  // printf("buffer: %s ", cache_node->buffer == NULL ? "NULL" : "NOTN");
+  // printf("status: %d ", cache_node->status);
+  // printf("prev: %s ", cache_node->prev == NULL ? "NULL" : "NOTN");
+  // printf("next: %s\n", cache_node->next == NULL ? "NULL" : "NOTN");
   return;
 }
 
@@ -316,8 +320,14 @@ void print_cache_queue(cache_queue_t *cache_queue) {
     return;
   }
   cache_node_t *cache_node = cache_queue->front;
+  printf("  CURRENT LRU CACHE QUEUE:\n");
+  int count = 0;
   while (cache_node != NULL) {
-    print_cache_node(cache_node);
+    if (cache_node->http_info->info_complete) {
+      printf("\ncache slot %d:\n", count);
+      print_cache_node(cache_node);
+      count += 1;
+    }
     cache_node = cache_node->next;
   }
   return;
@@ -516,7 +526,7 @@ int readline(int sockfd, char *recvbuf, size_t read_size) {
 }
 
 void print_http_info(http_info_t *http_info) {
-  printf("\n\n  http info: \n");
+  printf("\n\n  HEADER INFO: \n");
   printf("status: %s\n", http_info->status);
   printf("host: %s\n", http_info->host);
   printf("path: %s\n", http_info->path);
@@ -559,7 +569,7 @@ int cache_recv(fd_node_t *fd_node) {
       if (fd_node->flag == 1) { // if it's conditional get
         if (strstr(fd_node->cache_node->http_info->status, "304") != NULL) {
           printf("Conditional GET return: 304\n");
-          print_http_info(fd_node->cache_node->http_info);
+          // print_http_info(fd_node->cache_node->http_info);
           // 304, NOT MODIFIED
           // update cache time in
           strcpy(fd_node->cache_node_backup->http_info->date,
@@ -789,8 +799,11 @@ http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
   if (fd_node->status == IDLE) {        // received full response
     fd_node->proxied->status = WRITING; // start writing to client
     // add cache node to LRU cache list
-    cache_enqueue(cache_queue, fd_node->cache_node);
-    // print_cache_queue(cache_queue);
+    if (is_cache_hit(cache_queue, fd_node->cache_node->http_info) == NULL) {
+      // if no cache hit
+      cache_enqueue(cache_queue, fd_node->cache_node);
+    }
+    print_cache_queue(cache_queue);
     fd_list_remove(fd_node); // remove from select list
     free_fd_node(&fd_node);
   }

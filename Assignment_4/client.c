@@ -123,6 +123,10 @@ http_err_t main(int argc, char *argv[]) {
 
   // first recv treatment
   numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
+  if (numbytes == 0) {
+    printf("server disconnected!\n");
+    return HTTP_FAIL;
+  }
   http_info_t *http_info = calloc(1, sizeof(http_info_t));
   parse_response(buf_recv, http_info);
   int content_length = atoi(http_info->content_length);
@@ -144,7 +148,7 @@ http_err_t main(int argc, char *argv[]) {
       if (count + numbytes > content_length) {
         offset = count + numbytes - content_length;
         write_data_to_file(&fp, buf_recv, numbytes - offset, 0);
-        close(fp);
+        fclose(fp);
         exit(0);
       } else {
         write_data_to_file(&fp, buf_recv, numbytes, 0);

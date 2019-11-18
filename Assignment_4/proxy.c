@@ -30,6 +30,7 @@ http_err_t main(int argc, char *argv[]) {
 
   while (1) {
     retval = fd_select(fd_list, &read_fds, &write_fds);
+    // print_fd_list(fd_list);
     if (retval == 0) {
       printf(".");
       fflush(stdout);

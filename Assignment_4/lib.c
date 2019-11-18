@@ -25,6 +25,8 @@ void parse_request(char req_buf[1500], http_info_t *req) {
 
   // \r\n is the delim here according to spec
   while ((token = strtok_r(_buf, "\r\n", &_buf))) {
+    memset(key, 0, strlen(buf));
+    memset(value, 0, strlen(buf));
     // printf("token:%s\n", token);
     loc = strchr(token, ' ');
     pos = (loc == NULL ? -1 : loc - token);
@@ -40,6 +42,8 @@ void parse_request(char req_buf[1500], http_info_t *req) {
       strcpy(req->connection, value);
     }
   }
+  free(key);
+  free(value);
 }
 
 void parse_response(char res_buf[1500], http_info_t *res) {
@@ -71,6 +75,8 @@ void parse_response(char res_buf[1500], http_info_t *res) {
       // EOF
       break;
     }
+    memset(key, 0, strlen(buf));
+    memset(value, 0, strlen(buf));
 
     strncpy(key, token, pos);
     strncpy(value, &(token[pos + 1]), strlen(token));
@@ -82,6 +88,11 @@ void parse_response(char res_buf[1500], http_info_t *res) {
     }
     // add more fields which we are interested in
   }
+
+  token = strstr(res_buf, "\r\n\r\n");
+  printf("\n\n  RESPONSE HEADER:\n%.*s", (int)(token - res_buf), res_buf);
+  free(key);
+  free(value);
 }
 //
 // given sockfd, return local port
@@ -504,7 +515,7 @@ int readline(int sockfd, char *recvbuf, size_t read_size) {
 }
 
 void print_http_info(http_info_t *http_info) {
-  printf("http info: \n");
+  printf("\n\n  http info: \n");
   printf("host: %s\n", http_info->host);
   printf("path: %s\n", http_info->path);
   printf("date: %s\n", http_info->date);
@@ -545,9 +556,8 @@ int cache_recv(fd_node_t *fd_node) {
       parse_response(buf_recv, fd_node->cache_node->http_info);
       // toggle flag, prevent later no parsing
       fd_node->cache_node->http_info->info_complete = 1;
+      // fill in header fields from response
       print_http_info(fd_node->cache_node->http_info);
-
-      // exit(0);
     }
 
     if (numbytes == 0) {
@@ -661,15 +671,16 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
   if (fd_node->status == IDLE) {              // read complete, start parsing
     if (strstr(buffer, "\r\n\r\n") != NULL) { // contains \r\n\r\n
       parse_request(buffer, fd_node->cache_node->http_info);
-      print_http_info(fd_node->cache_node->http_info);
-      // exit(0); // early exit test
+      // print_http_info(fd_node->cache_node->http_info);
     }
 
     if (server_lookup_connect(fd_node->cache_node->http_info->host, "80",
                               &server_fd) != HTTP_OK) {
       // TODO: handle connection error
       tmp_node = fd_node->next;
+      close(fd_node->fd);
       fd_list_remove(fd_node);
+      free_fd_node(&fd_node);
       printf("connection failed.  fd cleanup\n");
     } else {
       server_node = new_fd_node(NULL, NULL, server_fd, SERVER, WRITING,
@@ -679,7 +690,7 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
       fd_node->proxied = server_node;
       // serve after the next select call
       fd_list_append(fd_list, server_node);
-      
+
       if (is_cache_hit(cache_queue, fd_node->cache_node->http_info)) {
         printf("CACHE HIT!\n");
         // connect and send conditional get
@@ -720,8 +731,8 @@ http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
     fd_list_remove(fd_node);
     free_fd_node(&fd_node);
   } else {
-    printf("%ld/%ld Bytes to client\n", fd_node->offset,
-           fd_node->cache_node->buffer_size);
+    // printf("%ld/%ld Bytes to client\n", fd_node->offset,
+    //        fd_node->cache_node->buffer_size);
   }
   return HTTP_OK;
 }
@@ -731,8 +742,8 @@ http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
   // read http response from server
   int numbytes = cache_recv(fd_node);
   if (numbytes != 0) {
-    printf("%ld/%s bytes from server\n", fd_node->offset,
-           fd_node->cache_node->http_info->content_length);
+    // printf("%ld/%s bytes from server\n", fd_node->offset,
+    //        fd_node->cache_node->http_info->content_length);
   } else {
     printf("%s/%s bytes from server\n",
            fd_node->cache_node->http_info->content_length,

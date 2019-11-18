@@ -81,7 +81,7 @@ void print_cache_node(cache_node_t *cache_node);
 
 void print_cache_queue(cache_queue_t *cache_queue);
 
-int is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info);
+cache_node_t *is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info);
 
 void parse_request(char req_buf[1500], http_info_t *req);
 
@@ -101,9 +101,10 @@ typedef struct fd_node_t {
   int fd;
   fd_type_t type;
   node_status_t status;
-  cache_node_t *cache_node;
+  // reference cache hit node in backup
+  cache_node_t *cache_node, *cache_node_backup;
   off_t offset; // record partial read/write progress
-  // int flag;     // 1 for conditional get, 2 for normal get
+  int flag;     // 1 for conditional get, 2 for normal get
 } fd_node_t;
 
 typedef struct fd_list_t {

@@ -350,20 +350,19 @@ void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node) {
   return;
 }
 
-int is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info) {
+cache_node_t *is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info) {
   cache_node_t *node = cache_queue->front;
   while (node != NULL) {
-
     if (node->http_info->info_complete) {
       if (strcmp(node->http_info->host, http_info->host) == 0 &&
           strcmp(node->http_info->path, http_info->path) == 0) {
         // same url resource, cache hit
-        return 1;
+        return node;
       }
     }
     node = node->next;
   }
-  return 0;
+  return NULL;
 }
 // --- END LRU CACHE MANAGEMENT
 
@@ -379,7 +378,9 @@ fd_node_t *new_fd_node(fd_node_t *prev, fd_node_t *next, int fd, fd_type_t type,
       .type = type,
       .status = status,
       .cache_node = cache_node,
+      .cache_node_backup = NULL,
       .offset = 0,
+      .flag = 0,
   };
   return new_node;
 }
@@ -516,6 +517,7 @@ int readline(int sockfd, char *recvbuf, size_t read_size) {
 
 void print_http_info(http_info_t *http_info) {
   printf("\n\n  http info: \n");
+  printf("status: %s\n", http_info->status);
   printf("host: %s\n", http_info->host);
   printf("path: %s\n", http_info->path);
   printf("date: %s\n", http_info->date);
@@ -554,6 +556,21 @@ int cache_recv(fd_node_t *fd_node) {
   if (fd_node->type == SERVER) {
     if (fd_node->cache_node->http_info->info_complete == 0) {
       parse_response(buf_recv, fd_node->cache_node->http_info);
+      if (fd_node->flag == 1) { // if it's conditional get
+        if (strstr(fd_node->cache_node->http_info->status, "304") != NULL) {
+          printf("Conditional GET return: 304\n");
+          print_http_info(fd_node->cache_node->http_info);
+          // 304, NOT MODIFIED
+          // update cache time in
+          strcpy(fd_node->cache_node_backup->http_info->date,
+                 fd_node->cache_node->http_info->date);
+          // swap backup cache hit node to cache node
+          fd_node->proxied->cache_node = fd_node->cache_node_backup;
+          close(fd_node->fd);
+          fd_node->status = IDLE;
+          fd_node->offset = 0; // reset offset to head
+        }
+      }
       // toggle flag, prevent later no parsing
       fd_node->cache_node->http_info->info_complete = 1;
       // fill in header fields from response
@@ -576,6 +593,20 @@ int cache_send(fd_node_t *fd_node) {
   // send at most MAX_DATA_SIZE in one go
   int send_size = remain_size > MAX_DATA_SIZE ? MAX_DATA_SIZE : remain_size;
   char *buffer = fd_node->cache_node->buffer + fd_node->offset;
+  char conditional_get[500] = {0};
+
+  if (fd_node->type == SERVER) {
+    if (fd_node->flag == 1) { // send conditional get
+      sprintf(conditional_get,
+              "GET %s HTTP/1.0\r\nHost: %s\r\nIf-Modified-Since: %s\r\n\r\n",
+              fd_node->cache_node_backup->http_info->path,
+              fd_node->cache_node_backup->http_info->host,
+              fd_node->cache_node_backup->http_info->date);
+      buffer = conditional_get;
+      // send_size = strlen(conditional_get);
+    }
+  } // else, send normal get
+
   while ((numbytes = send(fd_node->fd, buffer, send_size, 0)) == -1 &&
          errno == EINTR) {
     // manually restarting
@@ -664,6 +695,7 @@ void fd_list_test() {
 http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
                                cache_queue_t *cache_queue) {
   fd_node_t *server_node, *tmp_node;
+  cache_node_t *cache_hit_node;
   int server_fd;
   int numbytes = cache_recv(fd_node);
   char *buffer = fd_node->cache_node->buffer;
@@ -690,12 +722,16 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
       fd_node->proxied = server_node;
       // serve after the next select call
       fd_list_append(fd_list, server_node);
-
-      if (is_cache_hit(cache_queue, fd_node->cache_node->http_info)) {
+      cache_hit_node =
+          is_cache_hit(cache_queue, fd_node->cache_node->http_info);
+      if (cache_hit_node != NULL) {
         printf("CACHE HIT!\n");
-        // connect and send conditional get
+        // connect cache hit node to server
+        fd_node->proxied->cache_node_backup = cache_hit_node;
+        server_node->flag = 1; // conditional get on next loop
       } else {
         // connect and send normal get
+        server_node->flag = 2; // normal get
         printf("CACHE MISS!\n");
       }
     }

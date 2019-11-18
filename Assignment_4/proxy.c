@@ -79,7 +79,7 @@ http_err_t main(int argc, char *argv[]) {
       if (fd_node->type == SERVER) {
         if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
           tmp_node = fd_node->next;
-          server_read_handler(fd_list, fd_node);
+          server_read_handler(fd_list, fd_node, cache_queue);
           fd_node = tmp_node;
         } // http response read complete
         else if (fd_node->status == WRITING &&

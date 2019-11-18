@@ -422,6 +422,7 @@ int cache_recv(fd_node_t *fd_node) {
   fd_node->offset += numbytes;
 
   // change fd_node status if recv complete
+  // TODO: it's an unreliable inference of client write complete
   if (numbytes < MAX_DATA_SIZE) {
     fd_node->status = IDLE;
     fd_node->offset = 0; // reset offset to head
@@ -525,13 +526,11 @@ void fd_list_test() {
 http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   fd_node_t *server_node, *tmp_node;
   int server_fd;
-  cache_recv(fd_node);
+  int numbytes = cache_recv(fd_node);
   if (fd_node->status == IDLE) { // read complete, start parsing
     printf("client request complete:\n\n%s\n", fd_node->cache_node->buffer);
     // TODO: add parsing from http request
-    // char host[] = "www.wikipedia.org";
-    // char host[] = "www.baidu.com";
-    char host[] = "httpbin.org";
+    char host[] = "man7.org";
     if (server_lookup_connect(host, "80", &server_fd) != HTTP_OK) {
       // TODO: handle connection error
       tmp_node = fd_node->next;
@@ -547,6 +546,7 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
       fd_list_append(fd_list, server_node);
     }
   } else { // partially read request
+    printf("read %d bytes from client..\n", numbytes);
     ;
   }
   // client read complete

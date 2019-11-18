@@ -1,5 +1,33 @@
 #include "headers.h"
 #include "lib.h"
+http_err_t open_file(FILE **fp, char *filename, char *mode) {
+  *fp = fopen(filename, mode);
+  if (*fp == NULL) {
+    printf("file: %s. open failed.\n", filename);
+    return HTTP_FAIL;
+  } else {
+    return HTTP_OK;
+  }
+}
+size_t write_data_to_file(FILE **fd, char *buf, size_t _numbytes) {
+  size_t numbytes;
+  numbytes = fwrite(buf, 1, _numbytes, *fd);
+  return numbytes;
+}
+
+char *get_filename(char *str) {
+  /* get the first token */
+  const char separator[] = "/";
+  char *token, *tmp;
+  token = strtok(str, separator);
+
+  /* walk through other tokens */
+  while (token != NULL) {
+    tmp = token;
+    token = strtok(NULL, separator);
+  }
+  return tmp;
+}
 
 http_err_t main(int argc, char *argv[]) {
   if (argc != 4) {
@@ -12,9 +40,7 @@ http_err_t main(int argc, char *argv[]) {
 
   char *proxy_address = argv[1];
   char *proxy_port = argv[2];
-  char *url = argv[3];
-  int numbytes = 0;
-  int sockfd = 0;
+  char *url;
 
   // this client supports all the possbile formats
   //  "www.cpluscplus.com";
@@ -22,16 +48,18 @@ http_err_t main(int argc, char *argv[]) {
   //  "https://www.cpluscplus.com";
   //  "https://www.cpluscplus.com/some";
 
-  printf("address: %s, port: %s, target: %s\n", proxy_address, proxy_port, url);
+  //  printf("address: %s, port: %s, target: %s\n", proxy_address, proxy_port,
+  //  argv[3]);
 
   int _size = strlen(argv[3]);
 
   url = malloc(_size * sizeof(char));
   memcpy(url, argv[3], _size);
 
-  if (server_lookup_connect(proxy_address, proxy_port, &sockfd) != HTTP_OK) {
-    // return HTTP_FAIL;
-  }
+  int numbytes = 0;
+  printf("address: %s, port: %s, target: %s\n", proxy_address, proxy_port, url);
+
+  int sockfd = 0;
 
   char *path = malloc(_size * sizeof(char));
   char *host = malloc(_size * sizeof(char));
@@ -75,10 +103,32 @@ http_err_t main(int argc, char *argv[]) {
   // add more fields if required
   sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Team4\r\n\r\n",
           path, host);
-  printf("request:\n%s\n", request);
+
+  char *filename = strdup(path);
+
+  
+  printf("request: %s\n", request);
   memcpy(buf_send, request, sizeof(request));
-  numbytes = written(sockfd, request, strlen(request)+1);
-  printf("sent %d bytes\n", numbytes);
-  numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
-  printf("\n\nResponse:\n%s\n", buf_recv);
+  printf("path: %s\n", path);
+
+  if (server_lookup_connect(proxy_address, proxy_port, &sockfd) != HTTP_OK) {
+    return HTTP_FAIL;
+  }
+  numbytes = written(sockfd, request, strlen(request) + 1);
+  printf("sent request to server\n");
+  filename = get_filename(filename);
+  printf("filename: %s\n", filename);
+  FILE *fp;
+  open_file(&fp, filename, "a");
+  while (1) {
+    numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
+    if (numbytes == 0) {
+      fclose(fp);
+      break;
+    } else {
+      write_data_to_file(&fp, buf_recv, numbytes);
+      printf("written %d bytes to file..\n", numbytes);
+    }
+  }
+  // printf("\n\nResponse:\n%s\n", buf_recv);
 }

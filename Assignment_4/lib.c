@@ -423,7 +423,15 @@ int cache_recv(fd_node_t *fd_node) {
 
   // change fd_node status if recv complete
   // TODO: it's an unreliable inference of client write complete
-  if (numbytes < MAX_DATA_SIZE) {
+  // cannot receiving 0 bytes as client is waiting for response
+  if (fd_node->type == CLIENT) {
+    fd_node->status = IDLE;
+    fd_node->offset = 0;
+  }
+
+  // can receive 0 byte from server
+  if (fd_node->type == SERVER && numbytes == 0) {
+    close(fd_node->fd);
     fd_node->status = IDLE;
     fd_node->offset = 0; // reset offset to head
   }
@@ -436,9 +444,8 @@ int cache_send(fd_node_t *fd_node) {
   int remain_size = fd_node->cache_node->buffer_size - fd_node->offset;
   // send at most MAX_DATA_SIZE in one go
   int send_size = remain_size > MAX_DATA_SIZE ? MAX_DATA_SIZE : remain_size;
-
-  while ((numbytes = send(fd_node->fd, fd_node->cache_node->buffer, send_size,
-                          0)) == -1 &&
+  char *buffer = fd_node->cache_node->buffer + fd_node->offset;
+  while ((numbytes = send(fd_node->fd, buffer, send_size, 0)) == -1 &&
          errno == EINTR) {
     // manually restarting
     continue;
@@ -546,7 +553,7 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
       fd_list_append(fd_list, server_node);
     }
   } else { // partially read request
-    printf("read %d bytes from client..\n", numbytes);
+    printf("client request received.\n");
     ;
   }
   // client read complete
@@ -569,14 +576,15 @@ http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
 
 http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   // send http response to client
-  cache_send(fd_node);
+  int numbytes = cache_send(fd_node);
   if (fd_node->status == IDLE) { // response sent complete
     printf("complete writing to client size: %ld\n",
            fd_node->cache_node->buffer_size);
+    close(fd_node->fd);
     fd_list_remove(fd_node);
     free_fd_node(&fd_node);
   } else {
-    printf("partial writing to client..\n");
+    printf("writing %d Bytes to client\n", numbytes);
   }
   return HTTP_OK;
 }
@@ -584,14 +592,13 @@ http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
 http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
                                cache_queue_t *cache_queue) {
   // read http response from server
-  printf("reading from server\n");
-  cache_recv(fd_node);
+  int numbytes = cache_recv(fd_node);
+  printf("read %d bytes from server\n", numbytes);
   if (fd_node->status == IDLE) {        // received full response
     fd_node->proxied->status = WRITING; // start writing to client
     // add cache node to LRU cache list
     cache_enqueue(cache_queue, fd_node->cache_node);
     print_cache_queue(cache_queue);
-    printf("%s\n", cache_queue->front->buffer);
     fd_list_remove(fd_node); // remove from select list
     free_fd_node(&fd_node);
   }

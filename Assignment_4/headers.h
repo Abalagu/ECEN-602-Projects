@@ -17,6 +17,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <regex.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "config.h"
 #include "lib.h"

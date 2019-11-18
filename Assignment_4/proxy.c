@@ -62,7 +62,7 @@ http_err_t main(int argc, char *argv[]) {
       if (fd_node->type == CLIENT) {
         if (fd_node->status == READING && FD_ISSET(fd_node->fd, &read_fds)) {
           tmp_node = fd_node->next;
-          client_read_handler(fd_list, fd_node);
+          client_read_handler(fd_list, fd_node, cache_queue);
           fd_node = tmp_node;
         }
         // send http response

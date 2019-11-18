@@ -15,12 +15,49 @@ typedef enum node_status_t {
   WRITING = 4, // for socket select
 } node_status_t;
 
+// -- HTTP INFO
+typedef struct {
+  char host[253]; // max size of a domain name
+  // randomly assigned, need a fix
+  char path[1500];
+  // these for testing
+  char user_agent[10];
+  char connection[10];
+} request_t;
+
+typedef struct {
+  // add fields you need to check
+  char status[20];
+  char content_length[10];
+  char date[30];
+  // etc, etc
+} response_t;
+
+typedef struct http_info_t {
+  char host[253]; // max size of a domain name
+  // randomly assigned, need a fix
+  char path[100];
+  // these for testing
+  char user_agent[10];
+  char connection[10];
+  // add fields you need to check
+  char status[20];
+  char content_length[10];
+  char date[30];
+  // etc, etc
+  int info_complete;
+} http_info_t;
+
+void print_http_info(http_info_t *http_info);
+// -- HTTP INFO
+
 // --- BEGIN LRU CACHE MANAGEMENT ---
 
 typedef struct cache_node_t {
   struct cache_node_t *prev, *next;
   char *buffer;
   size_t buffer_size;
+  http_info_t *http_info;
   node_status_t status;
 } cache_node_t;
 
@@ -44,6 +81,8 @@ void print_cache_node(cache_node_t *cache_node);
 
 void print_cache_queue(cache_queue_t *cache_queue);
 
+int is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info);
+
 // --- END LRU CACHE MANAGEMENT
 
 // --- BEGIN FD MANAGEMENT ---
@@ -61,6 +100,7 @@ typedef struct fd_node_t {
   node_status_t status;
   cache_node_t *cache_node;
   off_t offset; // record partial read/write progress
+  // int flag;     // 1 for conditional get, 2 for normal get
 } fd_node_t;
 
 typedef struct fd_list_t {
@@ -109,7 +149,8 @@ int cache_recv(fd_node_t *fd_node);
 int cache_send(fd_node_t *fd_node);
 
 http_err_t listen_fd_handler(fd_list_t *fd_list, fd_node_t *fd_node);
-http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node);
+http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
+                               cache_queue_t *cache_queue);
 http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node);
 http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
                                cache_queue_t *cache_queue);

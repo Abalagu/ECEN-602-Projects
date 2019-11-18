@@ -1,6 +1,89 @@
 
 #include "lib.h"
 
+//--- PARSING FUNCTIONS ---
+void parse_request(char req_buf[1500], http_info_t *req) {
+  // char url[1500]= "GET /somefile HTTP/1.0\r\nHost: www.go.com\r\nUser-Agent:
+  // Team4\r\n\r\n"; fix size
+  char buf[1500] = {0};
+
+  // separate the first line which contains the path
+  char *loc = strchr(req_buf, '\r');
+  int pos = (loc == NULL ? -1 : loc - req_buf);
+
+  // First 4 and last 13 contain standard HTTP version info, not needed
+  int _pos = pos - 13;
+  strncpy(req->path, &req_buf[4], _pos);
+
+  // rest of the header
+  memcpy(buf, &(req_buf[pos + 2]), 1500 * sizeof(char));
+
+  char *token;
+  char *_buf = buf;
+  char *key = malloc(strlen(buf));
+  char *value = malloc(strlen(buf));
+
+  // \r\n is the delim here according to spec
+  while ((token = strtok_r(_buf, "\r\n", &_buf))) {
+    // printf("token:%s\n", token);
+    loc = strchr(token, ' ');
+    pos = (loc == NULL ? -1 : loc - token);
+
+    strncpy(key, token, pos);
+    strncpy(value, &(token[pos + 1]), strlen(token));
+
+    if (!strcmp(key, "Host:")) {
+      strcpy(req->host, value);
+    } else if (!strcmp(key, "User-Agent:")) {
+      strcpy(req->user_agent, value);
+    } else if (!strcmp(key, "Connection:")) {
+      strcpy(req->connection, value);
+    }
+  }
+}
+
+void parse_response(char res_buf[1500], http_info_t *res) {
+  char buf[1500] = {0};
+
+  char *loc = strchr(res_buf, '\r');
+  int pos = (loc == NULL ? -1 : loc - res_buf);
+
+  // status code does not begin until 9
+  memcpy(res->status, &(res_buf[9]), pos - 9);
+
+  // copy rest of the buffer
+  memcpy(buf, &(res_buf[pos + 2]), 1500 * sizeof(char));
+  if (DEBUG)
+    printf("buf:%s\n", buf);
+
+  char *token;
+  char *_buf = buf;
+  char *key = malloc(strlen(buf));
+  char *value = malloc(strlen(buf));
+
+  // the delim is \r\n
+  while ((token = strtok_r(_buf, "\r\n", &_buf))) {
+    // printf("token:%s\n", token);
+    loc = strchr(token, ' ');
+    pos = (loc == NULL ? -1 : loc - token);
+
+    if (pos < 0) {
+      // EOF
+      break;
+    }
+
+    strncpy(key, token, pos);
+    strncpy(value, &(token[pos + 1]), strlen(token));
+
+    if (!strcmp(key, "Content-Length:")) {
+      strcpy(res->content_length, value);
+    } else if (!strcmp(key, "Date:")) {
+      strcpy(res->date, value);
+    }
+    // add more fields which we are interested in
+  }
+}
+//
 // given sockfd, return local port
 http_err_t get_sock_port(int sockfd, int *local_port) {
   struct sockaddr_in sin;
@@ -137,6 +220,7 @@ http_err_t server_init(char *port, int *sockfd) {
 cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
                              size_t buffer_size) {
   cache_node_t *cache_node = calloc(1, sizeof(cache_node_t));
+  http_info_t *http_info = calloc(1, sizeof(http_info_t));
   // designated initializer in C99
   // https://stackoverflow.com/questions/7265583/combine-designated-initializers-and-malloc-in-c99
   *cache_node = (cache_node_t){
@@ -145,7 +229,9 @@ cache_node_t *new_cache_node(cache_node_t *prev, cache_node_t *next,
       .buffer = NULL,
       .buffer_size = buffer_size,
       .status = IDLE,
+      .http_info = http_info,
   };
+
   if (buffer_size != 0) {
     // use calloc instead of malloc to both allocate and init to 0
     cache_node->buffer = calloc(buffer_size, sizeof(char));
@@ -251,6 +337,22 @@ void cache_enqueue(cache_queue_t *cache_queue, cache_node_t *new_node) {
   new_node->prev = NULL;
   cache_queue->front = new_node;
   return;
+}
+
+int is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info) {
+  cache_node_t *node = cache_queue->front;
+  while (node != NULL) {
+
+    if (node->http_info->info_complete) {
+      if (strcmp(node->http_info->host, http_info->host) == 0 &&
+          strcmp(node->http_info->path, http_info->path) == 0) {
+        // same url resource, cache hit
+        return 1;
+      }
+    }
+    node = node->next;
+  }
+  return 0;
 }
 // --- END LRU CACHE MANAGEMENT
 
@@ -401,6 +503,14 @@ int readline(int sockfd, char *recvbuf, size_t read_size) {
   return numbytes;
 }
 
+void print_http_info(http_info_t *http_info) {
+  printf("http info: \n");
+  printf("host: %s\n", http_info->host);
+  printf("path: %s\n", http_info->path);
+  printf("date: %s\n", http_info->date);
+  printf("content-length: %s\n", http_info->content_length);
+}
+
 // read to recvbuf, with specified offset
 int cache_recv(fd_node_t *fd_node) {
   int numbytes;
@@ -430,10 +540,21 @@ int cache_recv(fd_node_t *fd_node) {
   }
 
   // can receive 0 byte from server
-  if (fd_node->type == SERVER && numbytes == 0) {
-    close(fd_node->fd);
-    fd_node->status = IDLE;
-    fd_node->offset = 0; // reset offset to head
+  if (fd_node->type == SERVER) {
+    if (fd_node->cache_node->http_info->info_complete == 0) {
+      parse_response(buf_recv, fd_node->cache_node->http_info);
+      // toggle flag, prevent later no parsing
+      fd_node->cache_node->http_info->info_complete = 1;
+      print_http_info(fd_node->cache_node->http_info);
+
+      // exit(0);
+    }
+
+    if (numbytes == 0) {
+      close(fd_node->fd);
+      fd_node->status = IDLE;
+      fd_node->offset = 0; // reset offset to head
+    }
   }
 
   return numbytes;
@@ -530,15 +651,22 @@ void fd_list_test() {
   return;
 }
 
-http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
+http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
+                               cache_queue_t *cache_queue) {
   fd_node_t *server_node, *tmp_node;
   int server_fd;
   int numbytes = cache_recv(fd_node);
-  if (fd_node->status == IDLE) { // read complete, start parsing
-    printf("client request complete:\n\n%s\n", fd_node->cache_node->buffer);
-    // TODO: add parsing from http request
-    char host[] = "man7.org";
-    if (server_lookup_connect(host, "80", &server_fd) != HTTP_OK) {
+  char *buffer = fd_node->cache_node->buffer;
+
+  if (fd_node->status == IDLE) {              // read complete, start parsing
+    if (strstr(buffer, "\r\n\r\n") != NULL) { // contains \r\n\r\n
+      parse_request(buffer, fd_node->cache_node->http_info);
+      print_http_info(fd_node->cache_node->http_info);
+      // exit(0); // early exit test
+    }
+
+    if (server_lookup_connect(fd_node->cache_node->http_info->host, "80",
+                              &server_fd) != HTTP_OK) {
       // TODO: handle connection error
       tmp_node = fd_node->next;
       fd_list_remove(fd_node);
@@ -551,6 +679,14 @@ http_err_t client_read_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
       fd_node->proxied = server_node;
       // serve after the next select call
       fd_list_append(fd_list, server_node);
+      
+      if (is_cache_hit(cache_queue, fd_node->cache_node->http_info)) {
+        printf("CACHE HIT!\n");
+        // connect and send conditional get
+      } else {
+        // connect and send normal get
+        printf("CACHE MISS!\n");
+      }
     }
   } else { // partially read request
     printf("client request received.\n");
@@ -578,13 +714,14 @@ http_err_t client_write_handler(fd_list_t *fd_list, fd_node_t *fd_node) {
   // send http response to client
   int numbytes = cache_send(fd_node);
   if (fd_node->status == IDLE) { // response sent complete
-    printf("complete writing to client size: %ld\n",
+    printf("%ld/%ld Bytes to client\n", fd_node->cache_node->buffer_size,
            fd_node->cache_node->buffer_size);
     close(fd_node->fd);
     fd_list_remove(fd_node);
     free_fd_node(&fd_node);
   } else {
-    printf("writing %d Bytes to client\n", numbytes);
+    printf("%ld/%ld Bytes to client\n", fd_node->offset,
+           fd_node->cache_node->buffer_size);
   }
   return HTTP_OK;
 }
@@ -593,12 +730,20 @@ http_err_t server_read_handler(fd_list_t *fd_list, fd_node_t *fd_node,
                                cache_queue_t *cache_queue) {
   // read http response from server
   int numbytes = cache_recv(fd_node);
-  printf("read %d bytes from server\n", numbytes);
+  if (numbytes != 0) {
+    printf("%ld/%s bytes from server\n", fd_node->offset,
+           fd_node->cache_node->http_info->content_length);
+  } else {
+    printf("%s/%s bytes from server\n",
+           fd_node->cache_node->http_info->content_length,
+           fd_node->cache_node->http_info->content_length);
+  }
+
   if (fd_node->status == IDLE) {        // received full response
     fd_node->proxied->status = WRITING; // start writing to client
     // add cache node to LRU cache list
     cache_enqueue(cache_queue, fd_node->cache_node);
-    print_cache_queue(cache_queue);
+    // print_cache_queue(cache_queue);
     fd_list_remove(fd_node); // remove from select list
     free_fd_node(&fd_node);
   }

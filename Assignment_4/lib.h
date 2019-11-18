@@ -83,6 +83,9 @@ void print_cache_queue(cache_queue_t *cache_queue);
 
 int is_cache_hit(cache_queue_t *cache_queue, http_info_t *http_info);
 
+void parse_request(char req_buf[1500], http_info_t *req);
+
+void parse_response(char res_buf[1500], http_info_t *res);
 // --- END LRU CACHE MANAGEMENT
 
 // --- BEGIN FD MANAGEMENT ---

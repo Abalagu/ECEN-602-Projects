@@ -9,9 +9,10 @@ http_err_t open_file(FILE **fp, char *filename, char *mode) {
     return HTTP_OK;
   }
 }
-size_t write_data_to_file(FILE **fd, char *buf, size_t _numbytes) {
+size_t write_data_to_file(FILE **fd, char *buf, size_t _numbytes,
+                          off_t offset) {
   size_t numbytes;
-  numbytes = fwrite(buf, 1, _numbytes, *fd);
+  numbytes = fwrite(buf + offset, 1, _numbytes, *fd);
   return numbytes;
 }
 
@@ -106,7 +107,6 @@ http_err_t main(int argc, char *argv[]) {
 
   char *filename = strdup(path);
 
-  
   printf("request: %s\n", request);
   memcpy(buf_send, request, sizeof(request));
   printf("path: %s\n", path);
@@ -120,14 +120,37 @@ http_err_t main(int argc, char *argv[]) {
   printf("filename: %s\n", filename);
   FILE *fp;
   open_file(&fp, filename, "a");
+
+  // first recv treatment
+  numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
+  http_info_t *http_info = calloc(1, sizeof(http_info_t));
+  parse_response(buf_recv, http_info);
+  int content_length = atoi(http_info->content_length);
+  printf("content length: %d\n", content_length);
+
+  char *entity_body_head = strstr(buf_recv, "\r\n\r\n");
+  off_t offset = entity_body_head - buf_recv + 4;
+  printf("offset: %ld\n", offset);
+  numbytes = write_data_to_file(&fp, buf_recv + offset, numbytes - offset, 0);
+  int count = numbytes;
+
   while (1) {
     numbytes = readline(sockfd, buf_recv, MAX_DATA_SIZE);
     if (numbytes == 0) {
       fclose(fp);
       break;
     } else {
-      write_data_to_file(&fp, buf_recv, numbytes);
-      printf("written %d bytes to file..\n", numbytes);
+      offset = 0;
+      if (count + numbytes > content_length) {
+        offset = count + numbytes - content_length;
+        write_data_to_file(&fp, buf_recv, numbytes - offset, 0);
+        close(fp);
+        exit(0);
+      } else {
+        write_data_to_file(&fp, buf_recv, numbytes, 0);
+        count += numbytes;
+      }
+      printf("written %ld bytes to file..\n", numbytes - offset);
     }
   }
   // printf("\n\nResponse:\n%s\n", buf_recv);

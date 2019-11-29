@@ -113,7 +113,7 @@ $ftp2 attach-agent $tcp2
 # writes the data to the output files
 proc record {} {
 	global sink1 sink2 f1 f2
-	set ns [new simulator]
+	set ns [Simulator instance]
 	set time 0.5
 
 	set bw1 [$sink1 set bytes_]
@@ -141,7 +141,7 @@ proc finish {} {
 	close $nf
 	#Execute nam on the trace file
 	exec nam out.nam &
-	exec xgraph out1.tr out2.tr -geometry 800*400 &
+	exec xgraph out1.tr out2.tr -geometry 800x400 &
 	exit 0
 }
 
@@ -152,6 +152,7 @@ $ns at 4.5 "$ftp1 stop"
 
 #Call the finish procedure after 5 seconds simulation time
 $ns at 5.0 "finish"
+$ns at 0.5 "record"
 
 #Run the simulation
 $ns run

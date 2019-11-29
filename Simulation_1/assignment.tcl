@@ -1,5 +1,4 @@
 # Usage: ns2.tcl <TCP_flavor> <case_no> 
-
 if {$argc != 2} {
 	puts stderr "ERROR! ns2 called with wrong number of arguements! ($argc)"
 	exit 1
@@ -8,10 +7,10 @@ if {$argc != 2} {
 	set case_no [lindex $argv 1]
 }
 
-#Create a simulator object
+# Create a simulator object
 set ns [new Simulator]
 
-# delay 
+# define delay 
 if {$case_no == 1} {
 	set src1_r1_delay 5ms
 	set r2_rcv1_delay 5ms
@@ -35,7 +34,7 @@ if {$case_no == 1} {
 $ns color 1 Red 
 $ns color 2 Blue
 
-#Open the nam trace file
+# Open the nam trace file
 set f1 [open out1.tr w]
 set f2 [open out2.tr w]
 set nf [open out.nam w]
@@ -43,6 +42,7 @@ $ns trace-all $nf
 $ns namtrace-all $nf
 
 
+# define variables
 set src1 [$ns node]
 set src2 [$ns node]
 set r1 [$ns node]
@@ -50,7 +50,11 @@ set r2 [$ns node]
 set rcv1 [$ns node]
 set rcv2 [$ns node]
 
+set throughput1 0
+set throughput2 0
+set counter 0
 
+# define links
 $ns duplex-link $src1 $r1 10Mb $src1_r1_delay DropTail
 $ns duplex-link $src2 $r1 10Mb $src2_r1_delay DropTail
 $ns duplex-link $r1 $r2 1Mb 5ms DropTail
@@ -112,18 +116,25 @@ $ftp2 attach-agent $tcp2
 
 # writes the data to the output files
 proc record {} {
-	global sink1 sink2 f1 f2
+	global sink1 sink2 f1 f2 throughput1 throughput2 counter
 	set ns [Simulator instance]
 	set time 0.5
 
-	set bw1 [$sink1 set bytes_]
-	set bw2 [$sink2 set bytes_]
+	set b1 [$sink1 set bytes_]
+	set b2 [$sink2 set bytes_]
 	set now [$ns now]
 
 	# calculate bw in Mbits and write to the file
-	puts $f1 "$now [expr $bw1/$time*8/1000000]"
-	puts $f2 "$now [expr $bw2/$time*8/1000000]"
+	set bw1 [expr $b1/$time*8/1000000]
+	set bw2 [expr $b2/$time*8/1000000]
 
+	puts $f1 "$now $bw1"
+	puts $f2 "$now $bw2"
+
+	set throughput1 [expr $throughput1 + $bw1]
+	set throughput2 [expr $throughput2 + $bw2]
+
+	set counter [expr $counter + 1]
 	# reset the bytes_ values on the traffic sinks
 	$sink1 set bytes_ 0
 	$sink2 set bytes_ 0
@@ -131,28 +142,30 @@ proc record {} {
 	$ns at [expr $now+$time] "record"
 }
 
-#Define a 'finish' procedure
+# Define a 'finish' procedure
 proc finish {} {
-	global ns f1 f2 nf
+	global ns f1 f2 nf throughput1 throughput2 counter
 	$ns flush-trace
 	#Close the trace file
 	close $f1
 	close $f2
 	close $nf
-	#Execute nam on the trace file
-	exec nam out.nam &
-	exec xgraph out1.tr out2.tr -geometry 800x400 &
+	# Execute nam on the trace file
+	# exec nam out.nam &
+	# exec xgraph out1.tr out2.tr -geometry 800x400 &
+	puts "Throughput for Src1: [expr $throughput1/$counter]" 
+	puts "Throughput for Src2: [expr $throughput2/$counter]" 
+
 	exit 0
 }
 
-$ns at 0.5 "$ftp1 start"
-$ns at 1.5 "$ftp2 start"
-$ns at 4.0 "$ftp2 stop"
-$ns at 4.5 "$ftp1 stop"
-
 #Call the finish procedure after 5 seconds simulation time
-$ns at 5.0 "finish"
-$ns at 0.5 "record"
+$ns at 50.0 "$ftp1 start"
+$ns at 50.0 "$ftp2 start"
+$ns at 100.0 "record"
+$ns at 400.0 "$ftp2 stop"
+$ns at 400.0 "$ftp1 stop"
+$ns at 500.0 "finish"
 
 #Run the simulation
 $ns run

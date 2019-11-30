@@ -155,6 +155,7 @@ proc finish {} {
 	# exec xgraph out1.tr out2.tr -geometry 800x400 &
 	puts "Throughput for Src1: [expr $throughput1/$counter]" 
 	puts "Throughput for Src2: [expr $throughput2/$counter]" 
+	puts "Ratio: [expr ($throughput1/$counter)/($throughput2/$counter)]"
 
 	exit 0
 }
